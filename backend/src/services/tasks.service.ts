@@ -1,3 +1,4 @@
+import mongoose from "mongoose";
 import { TaskModel } from "../models/task.model";
 import type { CreateTaskRequest, DetailBlock } from "../shared/types";
 
@@ -13,9 +14,9 @@ export class TasksService {
     this.taskModel = new TaskModel();
   }
 
-  async createTask(data: CreateTaskRequest): Promise<any> {
-    // Check if task name already exists
-    const existingTask = await this.taskModel.findByTaskName(data.taskName.trim());
+  async createTask(data: CreateTaskRequest, userId: string): Promise<any> {
+    // Check if task name already exists for this user
+    const existingTask = await this.taskModel.findByTaskName(data.taskName.trim(), userId);
     if (existingTask) {
       throw new Error("Task name already exists. Please use a unique name.");
     }
@@ -40,6 +41,7 @@ export class TasksService {
 
     // Create task document
     const taskData = {
+      userId: new mongoose.Types.ObjectId(userId),
       taskName: data.taskName.trim(),
       details: cleanedDetails,
       hours: data.hours,
@@ -55,12 +57,30 @@ export class TasksService {
     };
   }
 
-  async getTasks(): Promise<any> {
-    const items = await this.taskModel.findAll(100);
-    return { success: true, data: items, message: "Tasks retrieved successfully" };
+  async getTasks(userId: string, page: number = 1, limit: number = 10): Promise<any> {
+    // Validate and sanitize inputs
+    const validPage = Math.max(1, Math.floor(page));
+    const validLimit = Math.max(1, Math.min(100, Math.floor(limit))); // Max 100 items per page
+
+    const { items, total } = await this.taskModel.findPaginated(userId, validPage, validLimit);
+    const totalPages = Math.ceil(total / validLimit);
+
+    return {
+      success: true,
+      data: items,
+      pagination: {
+        currentPage: validPage,
+        totalPages,
+        totalItems: total,
+        itemsPerPage: validLimit,
+        hasNextPage: validPage < totalPages,
+        hasPreviousPage: validPage > 1,
+      },
+      message: "Tasks retrieved successfully",
+    };
   }
 
-  async getTaskDetails(id: string): Promise<any> {
+  async getTaskDetails(id: string, userId: string): Promise<any> {
     const rawId = typeof id === "string" ? id.trim() : "";
 
     // Validate ID format
@@ -71,7 +91,7 @@ export class TasksService {
       throw new Error("Invalid id");
     }
 
-    const details = await this.taskModel.getDetails(rawId);
+    const details = await this.taskModel.getDetails(rawId, userId);
     return { ok: true, details };
   }
 }

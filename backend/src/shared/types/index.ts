@@ -51,9 +51,19 @@ export interface CreateTaskResponse {
   message: string;
 }
 
+export interface PaginationMetadata {
+  currentPage: number;
+  totalPages: number;
+  totalItems: number;
+  itemsPerPage: number;
+  hasNextPage: boolean;
+  hasPreviousPage: boolean;
+}
+
 export interface GetTasksResponse {
   success: boolean;
   data: Task[];
+  pagination: PaginationMetadata;
   message: string;
 }
 

@@ -2,6 +2,7 @@ import mongoose, { Schema, Document, Model } from "mongoose";
 import type { DetailBlock } from "../shared/types";
 
 export interface TaskDocument extends Document {
+    userId: mongoose.Types.ObjectId;
     taskName: string;
     hours: number;
     details: DetailBlock[];
@@ -27,6 +28,7 @@ const detailBlockSchema = new Schema<DetailBlock>(
 
 const taskSchema = new Schema<TaskDocument>(
     {
+        userId: { type: Schema.Types.ObjectId, ref: "users", required: true, index: true },
         taskName: { type: String, required: true, trim: true },
         hours: { type: Number, required: true },
         details: { type: [detailBlockSchema], default: [] },
@@ -51,10 +53,10 @@ export class TaskModel {
     }
 
     /**
-     * Find a task by its name
+     * Find a task by its name for a specific user
      */
-    async findByTaskName(taskName: string): Promise<TaskDocument | null> {
-        return this.model.findOne({ taskName: taskName.trim() });
+    async findByTaskName(taskName: string, userId: string): Promise<TaskDocument | null> {
+        return this.model.findOne({ taskName: taskName.trim(), userId });
     }
 
     /**
@@ -69,11 +71,12 @@ export class TaskModel {
     }
 
     /**
-     * Get all tasks with aggregation (sorted by createdAt, limited)
+     * Get all tasks with aggregation (sorted by createdAt, limited) for a specific user
      */
-    async findAll(limit: number = 100): Promise<TaskListItem[]> {
+    async findAll(userId: string, limit: number = 100): Promise<TaskListItem[]> {
         const items = await this.model
             .aggregate([
+                { $match: { userId: new mongoose.Types.ObjectId(userId) } },
                 {
                     $project: {
                         _id: { $toString: "$_id" },
@@ -95,26 +98,63 @@ export class TaskModel {
         })) as TaskListItem[];
     }
 
-    async findById(id: string): Promise<TaskDocument | null> {
+    /**
+     * Get paginated tasks with total count for a specific user
+     */
+    async findPaginated(userId: string, page: number = 1, limit: number = 10): Promise<{ items: TaskListItem[]; total: number }> {
+        const skip = (page - 1) * limit;
+
+        // Get total count for this user
+        const total = await this.model.countDocuments({ userId });
+
+        // Get paginated items
+        const items = await this.model
+            .aggregate([
+                { $match: { userId: new mongoose.Types.ObjectId(userId) } },
+                {
+                    $project: {
+                        _id: { $toString: "$_id" },
+                        taskName: 1,
+                        hours: 1,
+                        createdAt: 1,
+                        detailsCount: { $size: { $ifNull: ["$details", []] } },
+                    },
+                },
+                { $sort: { createdAt: -1 } },
+                { $skip: skip },
+                { $limit: limit },
+            ])
+            .exec();
+
+        // Add sequential number based on absolute position
+        const itemsWithNo = items.map((item, index) => ({
+            ...item,
+            no: skip + index + 1,
+        })) as TaskListItem[];
+
+        return { items: itemsWithNo, total };
+    }
+
+    async findById(id: string, userId: string): Promise<TaskDocument | null> {
         if (!mongoose.Types.ObjectId.isValid(id)) {
             return null;
         }
-        return this.model.findById(id);
+        return this.model.findOne({ _id: id, userId });
     }
 
-    async findBySequenceNumber(no: number): Promise<TaskDocument | null> {
+    async findBySequenceNumber(no: number, userId: string): Promise<TaskDocument | null> {
         if (no <= 0 || !Number.isInteger(no)) {
             return null;
         }
 
         return this.model
-            .findOne({})
+            .findOne({ userId })
             .sort({ createdAt: -1 })
             .skip(no - 1)
             .limit(1);
     }
 
-    async getDetails(id: string): Promise<DetailBlock[]> {
+    async getDetails(id: string, userId: string): Promise<DetailBlock[]> {
         const rawId = id.trim();
         const isObjectId = mongoose.Types.ObjectId.isValid(rawId);
         const numericNo = /^\d+$/.test(rawId) ? Number(rawId) : NaN;
@@ -122,10 +162,10 @@ export class TaskModel {
         let task: TaskDocument | null = null;
 
         if (isObjectId) {
-            task = await this.model.findById(rawId).select("details");
+            task = await this.model.findOne({ _id: rawId, userId }).select("details");
         } else if (!Number.isNaN(numericNo) && numericNo > 0) {
             task = await this.model
-                .findOne({})
+                .findOne({ userId })
                 .select("details")
                 .sort({ createdAt: -1 })
                 .skip(numericNo - 1)

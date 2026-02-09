@@ -11,6 +11,12 @@ export class TasksController {
 
   async createTask(req: Request, res: Response): Promise<void> {
     try {
+      const userId = req.user?.userId;
+      if (!userId) {
+        res.status(401).json({ error: "Unauthorized" });
+        return;
+      }
+
       const body = req.body as Partial<CreateTaskRequest>;
 
       if (!body.taskName || typeof body.taskName !== "string") {
@@ -33,7 +39,7 @@ export class TasksController {
         return;
       }
 
-      const result = await this.tasksService.createTask(body as CreateTaskRequest);
+      const result = await this.tasksService.createTask(body as CreateTaskRequest, userId);
       res.status(201).json(result);
     } catch (error) {
       console.error("Create task error:", error);
@@ -45,9 +51,18 @@ export class TasksController {
     }
   }
 
-  async getTasks(_req: Request, res: Response): Promise<void> {
+  async getTasks(req: Request, res: Response): Promise<void> {
     try {
-      const result = await this.tasksService.getTasks();
+      const userId = req.user?.userId;
+      if (!userId) {
+        res.status(401).json({ error: "Unauthorized" });
+        return;
+      }
+
+      const page = parseInt(req.query.page as string) || 1;
+      const limit = parseInt(req.query.limit as string) || 10;
+
+      const result = await this.tasksService.getTasks(userId, page, limit);
       res.json(result);
     } catch (error) {
       console.error("Get tasks error:", error);
@@ -57,8 +72,14 @@ export class TasksController {
 
   async getTaskDetails(req: Request, res: Response): Promise<void> {
     try {
+      const userId = req.user?.userId;
+      if (!userId) {
+        res.status(401).json({ error: "Unauthorized" });
+        return;
+      }
+
       const { id } = req.params;
-      const result = await this.tasksService.getTaskDetails(id);
+      const result = await this.tasksService.getTaskDetails(id, userId);
       res.json(result);
     } catch (error) {
       console.error("Get task details error:", error);

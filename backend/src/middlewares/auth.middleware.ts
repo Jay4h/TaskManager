@@ -22,7 +22,7 @@ export async function authMiddleware(
     const authHeader = req.headers.authorization;
 
     if (!authHeader || !authHeader.startsWith("Bearer ")) {
-      res.status(401).json({ error: "Authorization header missing or invalid format" });
+      res.status(401).json({ error: "Authorization token is required. Please provide a valid Bearer token in the Authorization header." });
       return;
     }
 
