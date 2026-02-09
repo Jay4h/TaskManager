@@ -20,9 +20,19 @@ export interface CreateTaskRequest {
   details: DetailBlock[];
 }
 
+export interface PaginationMetadata {
+  currentPage: number;
+  totalPages: number;
+  totalItems: number;
+  itemsPerPage: number;
+  hasNextPage: boolean;
+  hasPreviousPage: boolean;
+}
+
 export interface GetTasksResponse {
   success: boolean;
   data: Task[];
+  pagination: PaginationMetadata;
   message: string;
 }
 

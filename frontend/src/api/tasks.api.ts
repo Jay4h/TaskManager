@@ -7,8 +7,10 @@ export const tasksApi = {
     return response.data;
   },
   
-  getTasks: async () => {
-    const response = await api.get<GetTasksResponse>("/tasks");
+  getTasks: async (page: number = 1, limit: number = 10) => {
+    const response = await api.get<GetTasksResponse>("/tasks", {
+      params: { page, limit }
+    });
     return response.data;
   },
   
