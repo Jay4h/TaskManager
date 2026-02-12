@@ -119,3 +119,6 @@ export interface CreateUserResponse {
   };
   message: string;
 }
+
+// ============ Error Types ============
+export { ForbiddenError, BadRequestError, NotFoundError } from "./errors.js";

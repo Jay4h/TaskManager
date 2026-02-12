@@ -7,7 +7,7 @@ import dotenv from "dotenv";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 // Load environment variables
-const envPath = path.resolve(__dirname, "../. env.local");
+const envPath = path.resolve(__dirname, "../.env.local");
 if (fs.existsSync(envPath)) {
   dotenv.config({ path: envPath });
 }
@@ -15,7 +15,10 @@ if (fs.existsSync(envPath)) {
 async function migrateRolesToObjectIds() {
   try {
     console.log("Connecting to MongoDB...");
-    const mongoUri = process.env.MONGODB_URI || "mongodb://localhost:27017/mydb";
+    const mongoUri = process.env.MONGODB_URI;
+    if (!mongoUri) {
+      throw new Error("MONGODB_URI environment variable is required");
+    }
     await mongoose.connect(mongoUri);
     console.log("✓ Connected to MongoDB");
 
@@ -33,7 +36,7 @@ async function migrateRolesToObjectIds() {
       console.log("✗ Admin role not found in roles collection");
       await mongoose.connection.close();
       process.exit(1);
-      return;
+      
     }
 
     console.log(`\nFound Admin Role ID: ${adminRole._id}`);

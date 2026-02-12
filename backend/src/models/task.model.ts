@@ -324,7 +324,14 @@ export class TaskModel {
         }
 
         // Validate updatedDetail
-        if (!updatedDetail || typeof updatedDetail !== 'object' || typeof updatedDetail.text !== 'string' || updatedDetail.text.trim().length === 0) {
+        if (
+            !updatedDetail ||
+            typeof updatedDetail !== 'object' ||
+            typeof updatedDetail.text !== 'string' ||
+            updatedDetail.text.trim().length === 0 ||
+            typeof updatedDetail.time !== 'string' ||
+            updatedDetail.time.trim().length === 0
+        ) {
             return null;
         }
 

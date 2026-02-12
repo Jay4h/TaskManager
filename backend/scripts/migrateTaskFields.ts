@@ -15,9 +15,11 @@ if (fs.existsSync(envPath)) {
 async function migrateTaskFields() {
   try {
     console.log("Connecting to MongoDB...");
-    const mongoUri = process.env.MONGODB_URI || "mongodb://localhost:27017/mydb";
-    await mongoose.connect(mongoUri);
-    console.log("✓ Connected to MongoDB");
+    const mongoUri = process.env.MONGODB_URI;
+    if (!mongoUri) {
+      throw new Error("MONGODB_URI environment variable is required");
+    }
+    await mongoose.connect(mongoUri);    console.log("✓ Connected to MongoDB");
 
     const db = mongoose.connection.db;
     if (!db) {

@@ -1,6 +1,7 @@
 import { Request, Response } from "express";
 import { UsersService } from "../services/users.service.js";
 import type { CreateUserRequest } from "../shared/types/index.js";
+import { ForbiddenError, BadRequestError, NotFoundError } from "../shared/types/index.js";
 
 // Helper function to validate password strength
 function isStrongPassword(password: string): boolean {
@@ -79,12 +80,11 @@ export class UsersController {
             res.status(201).json(result);
         } catch (error) {
             console.error("Create user error:", error);
-            if (error instanceof Error) {
-                if (error.message.includes("admin")) {
-                    res.status(403).json({ error: error.message });
-                } else {
-                    res.status(400).json({ error: error.message });
-                }
+            if (error instanceof ForbiddenError || error instanceof BadRequestError || error instanceof NotFoundError) {
+                const err = error as ForbiddenError | BadRequestError | NotFoundError;
+                res.status(err.statusCode).json({ error: err.message });
+            } else if (error instanceof Error) {
+                res.status(500).json({ error: error.message });
             } else {
                 res.status(500).json({ error: "Server error" });
             }
@@ -113,12 +113,11 @@ export class UsersController {
             res.json(result);
         } catch (error) {
             console.error("Get all users error:", error);
-            if (error instanceof Error) {
-                if (error.message.includes("admin")) {
-                    res.status(403).json({ error: error.message });
-                } else {
-                    res.status(400).json({ error: error.message });
-                }
+            if (error instanceof ForbiddenError || error instanceof BadRequestError || error instanceof NotFoundError) {
+                const err = error as ForbiddenError | BadRequestError | NotFoundError;
+                res.status(err.statusCode).json({ error: err.message });
+            } else if (error instanceof Error) {
+                res.status(500).json({ error: error.message });
             } else {
                 res.status(500).json({ error: "Server error" });
             }
@@ -146,14 +145,11 @@ export class UsersController {
             res.json(result);
         } catch (error) {
             console.error("Delete user error:", error);
-            if (error instanceof Error) {
-                if (error.message.includes("admin")) {
-                    res.status(403).json({ error: error.message });
-                } else if (error.message.includes("not found")) {
-                    res.status(404).json({ error: error.message });
-                } else {
-                    res.status(400).json({ error: error.message });
-                }
+            if (error instanceof ForbiddenError || error instanceof BadRequestError || error instanceof NotFoundError) {
+                const err = error as ForbiddenError | BadRequestError | NotFoundError;
+                res.status(err.statusCode).json({ error: err.message });
+            } else if (error instanceof Error) {
+                res.status(500).json({ error: error.message });
             } else {
                 res.status(500).json({ error: "Server error" });
             }

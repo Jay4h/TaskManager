@@ -33,7 +33,6 @@ async function promoteUserToAdmin() {
       console.log("✗ Admin role not found in roles collection");
       await mongoose.connection.close();
       process.exit(1);
-      return;
     }
 
     console.log(`\nAdmin Role ID: ${adminRole._id}`);

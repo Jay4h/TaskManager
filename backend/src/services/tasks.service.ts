@@ -4,14 +4,10 @@ import type { CreateTaskRequest, DetailBlock, TaskStatus } from "../shared/types
 
 function isValidTimeHHMM(value: unknown): value is string {
   if (typeof value !== "string") return false;
-  const match = /^(\d{2}):(\d{2})$/.test(value);
-  if (!match) return false;
-  
-  // Parse and validate ranges
-  const parts = value.split(":");
-  const hours = parseInt(parts[0], 10);
-  const minutes = parseInt(parts[1], 10);
-  
+  const match = value.match(/^(\d{2}):(\d{2})$/);
+  if (!match){return false;} 
+  const hours = parseInt(match[1], 10);
+  const minutes = parseInt(match[2], 10);
   return hours >= 0 && hours <= 23 && minutes >= 0 && minutes <= 59;
 }
 
@@ -182,6 +178,7 @@ export class TasksService {
    */
   private async isUserAdmin(userId: string): Promise<boolean> {
     try {
+       if (!mongoose.Types.ObjectId.isValid(userId)) {return false;}
       const db = mongoose.connection.db;
       if (!db) {
         return false;

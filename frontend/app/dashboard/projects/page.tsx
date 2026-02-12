@@ -14,14 +14,14 @@ export default function ProjectsPage() {
         // Validate role is one of the allowed values
         if (userData.role === "admin" || userData.role === "user") {
           setUserRole(userData.role);
-        } else {
-          console.warn("Invalid role in user data:", userData.role);
-          setUserRole("user");
+          return;
         }
       } catch (error) {
         console.error("Error parsing user data:", error);
       }
     }
+     // Fallback for all invalid states: no user, parse error, or invalid role
+     setUserRole("user");
   }, []);
 
   return <ProjectsClient userRole={userRole} />;

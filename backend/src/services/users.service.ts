@@ -2,6 +2,7 @@ import bcrypt from "bcrypt";
 import mongoose from "mongoose";
 import { UserModel } from "../models/user.model.js";
 import type { CreateUserRequest, CreateUserResponse } from "../shared/types/index.js";
+import { ForbiddenError, BadRequestError, NotFoundError } from "../shared/types/index.js";
 
 export class UsersService {
     private userModel: UserModel;
@@ -62,36 +63,36 @@ export class UsersService {
         // Verify admin access
         const isAdmin = await this.isUserAdmin(adminId);
         if (!isAdmin) {
-            throw new Error("Only admins can create users");
+            throw new ForbiddenError("Only admins can create users");
         }
 
         // Validate required fields
         if (!data.firstName || typeof data.firstName !== "string" || data.firstName.trim().length === 0) {
-            throw new Error("First name is required");
+            throw new BadRequestError("First name is required");
         }
 
         if (!data.lastName || typeof data.lastName !== "string" || data.lastName.trim().length === 0) {
-            throw new Error("Last name is required");
+            throw new BadRequestError("Last name is required");
         }
 
         if (!data.email || typeof data.email !== "string" || data.email.trim().length === 0) {
-            throw new Error("Email is required");
+            throw new BadRequestError("Email is required");
         }
 
         // Email validation
         const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
         if (!emailRegex.test(data.email)) {
-            throw new Error("Invalid email format");
+            throw new BadRequestError("Invalid email format");
         }
 
         if (!data.password || typeof data.password !== "string" || data.password.length < 6) {
-            throw new Error("Password must be at least 6 characters");
+            throw new BadRequestError("Password must be at least 6 characters");
         }
 
         // Check if user already exists
         const existingUser = await this.userModel.findByEmail(data.email);
         if (existingUser) {
-            throw new Error("User with this email already exists");
+            throw new BadRequestError("User with this email already exists");
         }
 
         // Hash password
@@ -102,7 +103,7 @@ export class UsersService {
         const roleId = await this.getRoleIdByName(requestedRole);
 
         if (!roleId) {
-            throw new Error(`Role '${requestedRole}' not found in database`);
+            throw new BadRequestError(`Role '${requestedRole}' not found in database`);
         }
 
         // Create user
@@ -135,12 +136,12 @@ export class UsersService {
     async getAllUsers(adminId: string, page: number = 1, limit: number = 10): Promise<any> {
         const isAdmin = await this.isUserAdmin(adminId);
         if (!isAdmin) {
-            throw new Error("Only admins can view all users");
+            throw new ForbiddenError("Only admins can view all users");
         }
 
         const db = mongoose.connection.db;
         if (!db) {
-            throw new Error("Database connection failed");
+            throw new BadRequestError("Database connection failed");
         }
 
         const skip = (page - 1) * limit;
@@ -200,22 +201,22 @@ export class UsersService {
     async deleteUser(userId: string, adminId: string): Promise<any> {
         const isAdmin = await this.isUserAdmin(adminId);
         if (!isAdmin) {
-            throw new Error("Only admins can delete users");
+            throw new ForbiddenError("Only admins can delete users");
         }
 
         // Prevent admin from deleting themselves
         if (userId === adminId) {
-            throw new Error("You cannot delete your own account");
+            throw new BadRequestError("You cannot delete your own account");
         }
 
         const db = mongoose.connection.db;
         if (!db) {
-            throw new Error("Database connection failed");
+            throw new BadRequestError("Database connection failed");
         }
 
         const user = await db.collection("users").findOne({ _id: new mongoose.Types.ObjectId(userId) });
         if (!user) {
-            throw new Error("User not found");
+            throw new NotFoundError("User not found");
         }
 
         await db.collection("users").deleteOne({ _id: new mongoose.Types.ObjectId(userId) });

@@ -36,6 +36,15 @@ export class ProjectModel {
     }
 
     /**
+     * Validate ObjectId format
+     */
+    private validateObjectId(id: string, fieldName: string): void {
+        if (!mongoose.Types.ObjectId.isValid(id)) {
+            throw new Error(`Invalid ${fieldName} format`);
+        }
+    }
+
+    /**
      * Create a new project
      */
     async create(projectData: Omit<ProjectDocument, "_id" | "createdAt" | "updatedAt" | keyof Document>): Promise<{ insertedId: string; project: ProjectDocument }> {
@@ -51,6 +60,7 @@ export class ProjectModel {
      * Find a project by ID
      */
     async findById(projectId: string): Promise<ProjectDocument | null> {
+        this.validateObjectId(projectId, "projectId");
         return this.model.findById(projectId).populate("assignedUsers", "firstName lastName email");
     }
 
@@ -65,9 +75,7 @@ export class ProjectModel {
      * Find projects by assigned user ID
      */
     async findByAssignedUser(userId: string): Promise<ProjectDocument[]> {
-        if (!mongoose.Types.ObjectId.isValid(userId)) {
-            throw new Error("Invalid userId format");
-        }
+        this.validateObjectId(userId, "userId");
         return this.model
             .find({ assignedUsers: new mongoose.Types.ObjectId(userId) })
             .populate("assignedUsers", "firstName lastName email")
@@ -79,6 +87,7 @@ export class ProjectModel {
      * Update a project
      */
     async update(projectId: string, updateData: Partial<Omit<ProjectDocument, "_id" | "createdAt" | "updatedAt" | keyof Document>>): Promise<ProjectDocument | null> {
+        this.validateObjectId(projectId, "projectId");
         return this.model.findByIdAndUpdate(projectId, updateData, { new: true, runValidators: true })
             .populate("assignedUsers", "firstName lastName email")
             .populate("createdBy", "firstName lastName email");
@@ -88,6 +97,7 @@ export class ProjectModel {
      * Delete a project
      */
     async delete(projectId: string): Promise<boolean> {
+        this.validateObjectId(projectId, "projectId");
         const result = await this.model.findByIdAndDelete(projectId);
         return result !== null;
     }
