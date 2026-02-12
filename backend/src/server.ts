@@ -1,16 +1,17 @@
-import { createApp } from "./app";
-import { ENV } from "./config/env";
-import connectDB from "./infrastructure/database/mongodb";
+import { createApp } from "./app.js";
+import { ENV } from "./config/env.js";
+import connectDB from "./infrastructure/database/mongodb.js";
 
 // Connect to MongoDB
 connectDB()
   .then(() => {
     console.log(`✅ Connected to MongoDB - Database: ${ENV.DB_NAME}`);
-    
+
     const app = createApp();
 
-    app.listen(ENV.PORT, () => {
-      console.log(`🚀 Server running on http://localhost:${ENV.PORT}`);
+    app.listen(ENV.PORT, '0.0.0.0', () => {
+      console.log(`🚀 Server running on http://0.0.0.0:${ENV.PORT}`);
+      console.log(`🌐 Access from network: http://192.168.2.200:${ENV.PORT}`);
       console.log(`📝 Environment: ${ENV.NODE_ENV}`);
     });
   })

@@ -5,11 +5,18 @@ export interface DetailBlock {
   time?: string; // HH:MM format
 }
 
+export type TaskStatus = "to-do" | "in-progress" | "completed";
+
 export interface Task {
   _id: string;
   taskName: string;
   hours: number;
   details: DetailBlock[];
+  status: TaskStatus;
+  projectId?: string;
+  assignedTo?: string;
+  startDate?: string;
+  dueDate?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -18,6 +25,11 @@ export interface CreateTaskRequest {
   taskName: string;
   hours: number;
   details: DetailBlock[];
+  status: TaskStatus;
+  projectId?: string;
+  assignedTo?: string;
+  startDate?: string;
+  dueDate?: string;
 }
 
 export interface PaginationMetadata {
@@ -39,5 +51,5 @@ export interface GetTasksResponse {
 export interface TaskDetailsResponse {
   ok: boolean;
   details: DetailBlock[];
-  message: string;
+  message?: string;
 }

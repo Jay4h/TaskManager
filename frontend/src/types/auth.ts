@@ -13,6 +13,7 @@ export interface AuthResponse {
     email: string;
     firstName: string;
     lastName: string;
+    role: "admin" | "user";
   };
   message: string;
 }

@@ -1,20 +1,21 @@
 "use client";
 import React, { useState, useEffect, useRef } from "react";
+import { useRouter } from "next/navigation";
 import axios from "axios";
 import { authApi } from "../../../src/api/auth.api";
-import type { LoginRequest } from "../../../src/types/auth";
 
 type User = {
     firstName: string;
     lastName: string;
     email: string;
+    role?: "admin" | "user";
 };
 
 export default function LoginForm() {
+    const router = useRouter();
     const [isOpen, setIsOpen] = useState(false);
     const [user, setUser] = useState<User | null>(null);
     const [isDropdownOpen, setIsDropdownOpen] = useState(false);
-    const [isRegisterMode, setIsRegisterMode] = useState(false);
     const [error, setError] = useState<string>("");
     const [isUpdatePasswordOpen, setIsUpdatePasswordOpen] = useState(false);
     const [passwordError, setPasswordError] = useState<string>("");
@@ -25,15 +26,15 @@ export default function LoginForm() {
         newPassword: "",
         confirmPassword: "",
     });
-        const getApiErrorMessage = (err: unknown, fallback: string) => {
-            if (axios.isAxiosError(err)) {
-                const data = err.response?.data as { error?: string; message?: string } | undefined;
-                return data?.error || data?.message || err.message || fallback;
-            }
+    const getApiErrorMessage = (err: unknown, fallback: string) => {
+        if (axios.isAxiosError(err)) {
+            const data = err.response?.data as { error?: string; message?: string } | undefined;
+            return data?.error || data?.message || err.message || fallback;
+        }
 
-            if (err instanceof Error) return err.message;
-            return fallback;
-        };
+        if (err instanceof Error) return err.message;
+        return fallback;
+    };
 
     const [isLoading, setIsLoading] = useState(false);
     const dropdownRef = useRef<HTMLDivElement>(null);
@@ -76,12 +77,10 @@ export default function LoginForm() {
 
     const openModal = () => {
         setIsOpen(true);
-        setIsRegisterMode(false);
         setError("");
     };
     const closeModal = () => {
         setIsOpen(false);
-        setIsRegisterMode(false);
         setError("");
     };
 
@@ -172,8 +171,6 @@ export default function LoginForm() {
         // Client-side validation
         const email = (data.email as string).trim();
         const password = (data.password as string);
-        const firstName = (data.firstName as string)?.trim();
-        const lastName = (data.lastName as string)?.trim();
 
         // Email validation
         const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -188,34 +185,9 @@ export default function LoginForm() {
             return;
         }
 
-        // Registration specific validation
-        if (isRegisterMode) {
-            if (!firstName) {
-                setError("First name is required");
-                return;
-            }
-            if (!lastName) {
-                setError("Last name is required");
-                return;
-            }
-        }
-
         try {
             setIsLoading(true);
-            let result;
-            if (isRegisterMode) {
-                // Registration mode
-                const registerData = {
-                    firstName,
-                    lastName,
-                    email,
-                    password,
-                } as unknown as LoginRequest;
-                result = await authApi.register(registerData);
-            } else {
-                // Login mode
-                result = await authApi.login(email, password);
-            }
+            const result = await authApi.login(email, password);
 
             // Store JWT token in localStorage
             localStorage.setItem("token", result.data.token);
@@ -225,6 +197,7 @@ export default function LoginForm() {
                 firstName: result.data.firstName,
                 lastName: result.data.lastName,
                 email: result.data.email,
+                role: result.data.role,
             };
 
             // Store user data
@@ -232,9 +205,8 @@ export default function LoginForm() {
             setUser(userData);
             window.dispatchEvent(new CustomEvent("authStateChanged", { detail: { isLoggedIn: true } }));
 
-            const action = isRegisterMode ? "Registration" : "Login";
-            alert(`Welcome! ${action} successful.`);
             closeModal();
+            router.push("/dashboard");
         } catch (error) {
             console.error("Auth error:", error);
             setError(getApiErrorMessage(error, "Authentication failed"));
@@ -272,7 +244,14 @@ export default function LoginForm() {
                     {isDropdownOpen && (
                         <div className="absolute right-0 mt-2 w-48 rounded-lg bg-white shadow-lg border border-gray-200 py-1 z-50">
                             <div className="px-4 py-2 border-b border-gray-100">
-                                <p className="text-sm font-medium text-gray-900">{user.firstName} {user.lastName}</p>
+                                <p className="text-sm font-medium text-gray-900 flex items-center gap-2">
+                                    {user.firstName} {user.lastName}
+                                    {user.role === "admin" && (
+                                        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-semibold bg-amber-100 text-amber-800">
+                                            Admin
+                                        </span>
+                                    )}
+                                </p>
                                 <p className="text-xs text-gray-500 truncate">{user.email}</p>
                             </div>
                             <button
@@ -310,7 +289,7 @@ export default function LoginForm() {
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
                     <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl">
                         <h2 className="mb-4 text-xl font-bold text-gray-800">
-                            {isRegisterMode ? "Register" : "Login"}
+                            Login
                         </h2>
 
                         {error && (
@@ -320,26 +299,6 @@ export default function LoginForm() {
                         )}
 
                         <form onSubmit={handleSubmit} className="space-y-4">
-                            {isRegisterMode && (
-                                <>
-                                    <input
-                                        type="text"
-                                        name="firstName"
-                                        placeholder="First Name"
-                                        required
-                                        className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
-                                        aria-required />
-
-                                    <input
-                                        type="text"
-                                        name="lastName"
-                                        placeholder="Last Name"
-                                        required
-                                        className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
-                                        aria-required />
-                                </>
-                            )}
-
                             <input
                                 type="email"
                                 name="email"
@@ -356,17 +315,7 @@ export default function LoginForm() {
                                 className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
                                 aria-required />
 
-                            <div className="flex justify-between items-center pt-2">
-                                <button
-                                    type="button"
-                                    onClick={() => setIsRegisterMode(!isRegisterMode)}
-                                    className="text-sm text-blue-600 hover:underline"
-                                >
-                                    {isRegisterMode ? "Already have an account? Login" : "Need an account? Register"}
-                                </button>
-                            </div>
-
-                            <div className="flex justify-end gap-3 pt-2">
+                            <div className="flex justify-end gap-3 pt-4">
                                 <button
                                     type="button"
                                     onClick={closeModal}
@@ -380,7 +329,7 @@ export default function LoginForm() {
                                     disabled={isLoading}
                                     className="rounded-lg bg-blue-600 px-4 py-2 font-semibold text-white hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
                                 >
-                                    {isLoading ? "Loading..." : isRegisterMode ? "Register" : "Login"}
+                                    {isLoading ? "Loading..." : "Login"}
                                 </button>
                             </div>
                         </form>

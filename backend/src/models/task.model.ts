@@ -1,11 +1,16 @@
 import mongoose, { Schema, Document, Model } from "mongoose";
-import type { DetailBlock } from "../shared/types";
+import type { DetailBlock } from "../shared/types/index.js";
 
 export interface TaskDocument extends Document {
     userId: mongoose.Types.ObjectId;
     taskName: string;
     hours: number;
     details: DetailBlock[];
+    status: "to-do" | "in-progress" | "completed";
+    projectId?: mongoose.Types.ObjectId;
+    assignedTo?: mongoose.Types.ObjectId;
+    startDate?: Date;
+    dueDate?: Date;
     createdAt: Date;
 }
 
@@ -16,6 +21,12 @@ export interface TaskListItem {
     createdAt: Date;
     detailsCount: number;
     no: number;
+    status: "to-do" | "in-progress" | "completed";
+    projectId?: string;
+    projectName?: string;
+    assignedTo?: string;
+    startDate?: Date;
+    dueDate?: Date;
 }
 
 const detailBlockSchema = new Schema<DetailBlock>(
@@ -32,6 +43,11 @@ const taskSchema = new Schema<TaskDocument>(
         taskName: { type: String, required: true, trim: true },
         hours: { type: Number, required: true },
         details: { type: [detailBlockSchema], default: [] },
+        status: { type: String, enum: ["to-do", "in-progress", "completed"], default: "to-do" },
+        projectId: { type: Schema.Types.ObjectId, ref: "projects", index: true },
+        assignedTo: { type: Schema.Types.ObjectId, ref: "users", index: true },
+        startDate: { type: Date },
+        dueDate: { type: Date },
     },
     {
         timestamps: true,
@@ -71,52 +87,59 @@ export class TaskModel {
     }
 
     /**
-     * Get all tasks with aggregation (sorted by createdAt, limited) for a specific user
+     * Get paginated tasks with total count for a specific user (tasks created by them or assigned to them)
      */
-    async findAll(userId: string, limit: number = 100): Promise<TaskListItem[]> {
-        const items = await this.model
-            .aggregate([
-                { $match: { userId: new mongoose.Types.ObjectId(userId) } },
-                {
-                    $project: {
-                        _id: { $toString: "$_id" },
-                        taskName: 1,
-                        hours: 1,
-                        createdAt: 1,
-                        detailsCount: { $size: { $ifNull: ["$details", []] } },
-                    },
-                },
-                { $sort: { createdAt: -1 } },
-                { $limit: limit },
-            ])
-            .exec();
-
-        // Add sequential number
-        return items.map((item, index) => ({
-            ...item,
-            no: index + 1,
-        })) as TaskListItem[];
-    }
-
-    /**
-     * Get paginated tasks with total count for a specific user
-     */
-    async findPaginated(userId: string, page: number = 1, limit: number = 10): Promise<{ items: TaskListItem[]; total: number }> {
+    async findPaginated(userId: string, page: number = 1, limit: number = 10, filter: string = "all"): Promise<{ items: TaskListItem[]; total: number }> {
         const skip = (page - 1) * limit;
+        const userObjectId = new mongoose.Types.ObjectId(userId);
+
+        // Build match condition based on filter
+        let matchCondition: any;
+        if (filter === "created") {
+            matchCondition = { userId: userObjectId };
+        } else if (filter === "assigned") {
+            // Only tasks assigned to user by someone else (not self-created)
+            matchCondition = { 
+                assignedTo: userObjectId,
+                userId: { $ne: userObjectId }
+            };
+        } else {
+            // "all" - tasks where user is either the creator OR the assignee
+            matchCondition = {
+                $or: [
+                    { userId: userObjectId },
+                    { assignedTo: userObjectId }
+                ]
+            };
+        }
 
         // Get total count for this user
-        const total = await this.model.countDocuments({ userId });
+        const total = await this.model.countDocuments(matchCondition);
 
         // Get paginated items
         const items = await this.model
             .aggregate([
-                { $match: { userId: new mongoose.Types.ObjectId(userId) } },
+                { $match: matchCondition },
+                {
+                    $lookup: {
+                        from: "projects",
+                        localField: "projectId",
+                        foreignField: "_id",
+                        as: "projectData"
+                    }
+                },
                 {
                     $project: {
                         _id: { $toString: "$_id" },
                         taskName: 1,
                         hours: 1,
                         createdAt: 1,
+                        status: 1,
+                        projectId: { $toString: "$projectId" },
+                        projectName: { $arrayElemAt: ["$projectData.projectName", 0] },
+                        assignedTo: { $toString: "$assignedTo" },
+                        startDate: 1,
+                        dueDate: 1,
                         detailsCount: { $size: { $ifNull: ["$details", []] } },
                     },
                 },
@@ -135,42 +158,193 @@ export class TaskModel {
         return { items: itemsWithNo, total };
     }
 
-    async findById(id: string, userId: string): Promise<TaskDocument | null> {
+    /**
+     * Get all paginated tasks for admin (no user filtering)
+     */
+    async findAllPaginated(page: number = 1, limit: number = 10, userId?: string, filter: string = "all"): Promise<{ items: TaskListItem[]; total: number }> {
+        const skip = (page - 1) * limit;
+
+        // Build match condition based on filter (for admin)
+        let matchCondition: any = {};
+        if (userId && filter === "created") {
+            matchCondition = { userId: new mongoose.Types.ObjectId(userId) };
+        } else if (userId && filter === "assigned") {
+            // Only tasks assigned to admin by someone else (not self-created)
+            const adminObjectId = new mongoose.Types.ObjectId(userId);
+            matchCondition = { 
+                assignedTo: adminObjectId,
+                userId: { $ne: adminObjectId }
+            };
+        }
+        // "all" - no filtering
+
+        // Get total count
+        const total = await this.model.countDocuments(matchCondition);
+
+        // Get paginated items
+        const items = await this.model
+            .aggregate([
+                { $match: matchCondition },
+                {
+                    $lookup: {
+                        from: "projects",
+                        localField: "projectId",
+                        foreignField: "_id",
+                        as: "projectData"
+                    }
+                },
+                {
+                    $project: {
+                        _id: { $toString: "$_id" },
+                        taskName: 1,
+                        hours: 1,
+                        createdAt: 1,
+                        status: 1,
+                        projectId: { $toString: "$projectId" },
+                        projectName: { $arrayElemAt: ["$projectData.projectName", 0] },
+                        assignedTo: { $toString: "$assignedTo" },
+                        startDate: 1,
+                        dueDate: 1,
+                        detailsCount: { $size: { $ifNull: ["$details", []] } },
+                    },
+                },
+                { $sort: { createdAt: -1 } },
+                { $skip: skip },
+                { $limit: limit },
+            ])
+            .exec();
+
+        // Add sequential number based on absolute position
+        const itemsWithNo = items.map((item, index) => ({
+            ...item,
+            no: skip + index + 1,
+        })) as TaskListItem[];
+
+        return { items: itemsWithNo, total };
+    }
+
+    async findById(id: string, userId: string, isAdmin: boolean = false): Promise<TaskDocument | null> {
         if (!mongoose.Types.ObjectId.isValid(id)) {
             return null;
         }
-        return this.model.findOne({ _id: id, userId });
+        
+        if (isAdmin) {
+            // Admins can access any task
+            return this.model.findOne({ _id: id });
+        }
+        
+        // Regular users can only access tasks they created or are assigned to
+        const userObjectId = new mongoose.Types.ObjectId(userId);
+        return this.model.findOne({
+            _id: id,
+            $or: [
+                { userId: userObjectId },
+                { assignedTo: userObjectId }
+            ]
+        });
     }
 
-    async findBySequenceNumber(no: number, userId: string): Promise<TaskDocument | null> {
+    async findBySequenceNumber(no: number, userId: string, isAdmin: boolean = false): Promise<TaskDocument | null> {
         if (no <= 0 || !Number.isInteger(no)) {
             return null;
         }
 
+        if (isAdmin) {
+            // Admins can access any task
+            return this.model
+                .findOne({})
+                .sort({ createdAt: -1 })
+                .skip(no - 1)
+                .limit(1);
+        }
+
+        // Regular users can only access tasks they created or are assigned to
+        const userObjectId = new mongoose.Types.ObjectId(userId);
         return this.model
-            .findOne({ userId })
+            .findOne({
+                $or: [
+                    { userId: userObjectId },
+                    { assignedTo: userObjectId }
+                ]
+            })
             .sort({ createdAt: -1 })
             .skip(no - 1)
             .limit(1);
     }
 
-    async getDetails(id: string, userId: string): Promise<DetailBlock[]> {
+    async getDetails(id: string, userId: string, isAdmin: boolean = false): Promise<DetailBlock[]> {
         const rawId = id.trim();
         const isObjectId = mongoose.Types.ObjectId.isValid(rawId);
         const numericNo = /^\d+$/.test(rawId) ? Number(rawId) : NaN;
 
         let task: TaskDocument | null = null;
 
-        if (isObjectId) {
-            task = await this.model.findOne({ _id: rawId, userId }).select("details");
-        } else if (!Number.isNaN(numericNo) && numericNo > 0) {
-            task = await this.model
-                .findOne({ userId })
-                .select("details")
-                .sort({ createdAt: -1 })
-                .skip(numericNo - 1)
-                .limit(1);
+        if (isAdmin) {
+            // Admins can view any task details
+            if (isObjectId) {
+                task = await this.model.findOne({ _id: rawId }).select("details");
+            } else if (!Number.isNaN(numericNo) && numericNo > 0) {
+                task = await this.model
+                    .findOne({})
+                    .select("details")
+                    .sort({ createdAt: -1 })
+                    .skip(numericNo - 1)
+                    .limit(1);
+            }
+        } else {
+            // Regular users can only view tasks they created or are assigned to
+            const userObjectId = new mongoose.Types.ObjectId(userId);
+            const matchCondition = {
+                $or: [
+                    { userId: userObjectId },
+                    { assignedTo: userObjectId }
+                ]
+            };
+
+            if (isObjectId) {
+                task = await this.model.findOne({ _id: rawId, ...matchCondition }).select("details");
+            } else if (!Number.isNaN(numericNo) && numericNo > 0) {
+                task = await this.model
+                    .findOne(matchCondition)
+                    .select("details")
+                    .sort({ createdAt: -1 })
+                    .skip(numericNo - 1)
+                    .limit(1);
+            }
         }
         return Array.isArray(task?.details) ? task.details : [];
+    }
+
+    /**
+     * Update a specific detail in a task
+     */
+    async updateDetail(taskId: string, detailIndex: number, updatedDetail: DetailBlock, userId: string, isAdmin: boolean = false): Promise<TaskDocument | null> {
+        if (!mongoose.Types.ObjectId.isValid(taskId)) {
+            return null;
+        }
+
+        let task: TaskDocument | null;
+        if (isAdmin) {
+            // Admins can update any task
+            task = await this.model.findOne({ _id: taskId });
+        } else {
+            // Regular users can only update tasks they created or are assigned to
+            const userObjectId = new mongoose.Types.ObjectId(userId);
+            task = await this.model.findOne({
+                _id: taskId,
+                $or: [
+                    { userId: userObjectId },
+                    { assignedTo: userObjectId }
+                ]
+            });
+        }
+
+        if (!task || !Array.isArray(task.details) || detailIndex < 0 || detailIndex >= task.details.length) {
+            return null;
+        }
+
+        task.details[detailIndex] = updatedDetail;
+        await task.save();
+        return task;
     }
 }

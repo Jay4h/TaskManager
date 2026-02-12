@@ -4,7 +4,8 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { tasksApi } from "../../../src/api/tasks.api";
-import type { CreateTaskRequest, DetailBlock } from "../../../src/types/task";
+import { projectsApi } from "../../../src/api/projects.api";
+import type { CreateTaskRequest, DetailBlock, TaskStatus } from "../../../src/types/task";
 
 type AddTaskFormProps = {
   onAdded?: () => void | Promise<void>;
@@ -17,8 +18,33 @@ export default function AddTaskForm({ onAdded, queryClient: qc }: AddTaskFormPro
   const queryClient = qc || defaultQueryClient;
   const [open, setOpen] = useState(false);
 
+  // Check if user is admin
+  const [isAdmin, setIsAdmin] = useState(false);
+  useEffect(() => {
+    const userStr = localStorage.getItem("user");
+    if (userStr) {
+      try {
+        const user = JSON.parse(userStr);
+        setIsAdmin(user.role === "admin");
+      } catch (e) {
+        setIsAdmin(false);
+      }
+    }
+  }, []);
+
   const [taskName, setTaskName] = useState("");
   const [hours, setHours] = useState<number>(0);
+  const [startDate, setStartDate] = useState("");
+  const [dueDate, setDueDate] = useState("");
+  const [status, setStatus] = useState<TaskStatus>("to-do");
+  const [assignedTo, setAssignedTo] = useState("");
+  const [projectId, setProjectId] = useState("");
+
+  // User and project options
+  const [users, setUsers] = useState<Array<{ _id: string; fullName: string }>>([]);
+  const [projects, setProjects] = useState<Array<{ _id: string; projectName: string }>>([]);
+  const [loadingUsers, setLoadingUsers] = useState(false);
+  const [loadingProjects, setLoadingProjects] = useState(false);
 
   // details is now an array
   const [details, setDetails] = useState<DetailBlock[]>([makeDetail()]);
@@ -26,10 +52,89 @@ export default function AddTaskForm({ onAdded, queryClient: qc }: AddTaskFormPro
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string>("");
 
+  // Fetch users when modal opens (admin only)
+  useEffect(() => {
+    if (open && isAdmin && users.length === 0) {
+      fetchUsers();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, isAdmin]);
+
+  // Fetch projects when modal opens or when user selection changes
+  useEffect(() => {
+    if (open) {
+      if (isAdmin) {
+        // Admin: fetch projects based on selected user, or their own projects if no user selected
+        if (assignedTo) {
+          fetchProjectsForUser(assignedTo);
+        } else {
+          // Fetch admin's own projects
+          fetchMyProjects();
+        }
+      } else {
+        // Regular user: always fetch their own projects
+        fetchMyProjects();
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, assignedTo, isAdmin]);
+
+  async function fetchUsers() {
+    setLoadingUsers(true);
+    try {
+      const response = await projectsApi.getAllUsersForDropdown();
+      if (response.success) {
+        setUsers(response.data);
+      }
+    } catch (err) {
+      console.error("Failed to fetch users:", err);
+    } finally {
+      setLoadingUsers(false);
+    }
+  }
+
+  async function fetchProjectsForUser(userId: string) {
+    setLoadingProjects(true);
+    setProjectId(""); // Reset project selection
+    try {
+      const response = await projectsApi.getProjectsForUser(userId);
+      if (response.success) {
+        setProjects(response.data);
+      }
+    } catch (err) {
+      console.error("Failed to fetch projects:", err);
+      setProjects([]);
+    } finally {
+      setLoadingProjects(false);
+    }
+  }
+
+  async function fetchMyProjects() {
+    setLoadingProjects(true);
+    setProjectId(""); // Reset project selection
+    try {
+      const response = await projectsApi.getMyProjects();
+      if (response.success) {
+        setProjects(response.data);
+      }
+    } catch (err) {
+      console.error("Failed to fetch projects:", err);
+      setProjects([]);
+    } finally {
+      setLoadingProjects(false);
+    }
+  }
+
   function openModal() {
     setError("");
     setTaskName("");
     setHours(0);
+    setStartDate("");
+    setDueDate("");
+    setStatus("to-do");
+    setAssignedTo("");
+    setProjectId("");
+    setProjects([]);
     setDetails([makeDetail()]);
     setOpen(true);
   }
@@ -65,34 +170,40 @@ export default function AddTaskForm({ onAdded, queryClient: qc }: AddTaskFormPro
   }
 
   const totalMinutes = useMemo(() => {
-  return details.reduce((sum, d) => {
-    if (!d.text.trim()) return sum;
+    return details.reduce((sum, d) => {
+      if (!d.text.trim()) return sum;
 
-    const h = Number(d.hours);
-    const m = Number(d.minutes);
+      const h = Number(d.hours);
+      const m = Number(d.minutes);
 
-    if (Number.isNaN(h) || Number.isNaN(m)) return sum;
+      if (Number.isNaN(h) || Number.isNaN(m)) return sum;
 
-    const safeH = Math.max(0, Math.floor(h));
-    const safeM = Math.min(59, Math.max(0, Math.floor(m)));
+      const safeH = Math.max(0, Math.floor(h));
+      const safeM = Math.min(59, Math.max(0, Math.floor(m)));
 
-    return sum + safeH * 60 + safeM;
-  }, 0);
-}, [details]);
+      return sum + safeH * 60 + safeM;
+    }, 0);
+  }, [details]);
 
 
   const totalHoursFromDetails = useMemo(() =>
-     totalMinutes / 60, [totalMinutes]);
+    totalMinutes / 60, [totalMinutes]);
 
 
   // Basic validation for time
   const detailsValidationError = useMemo(() => {
     // Count valid details
     const validDetails = details.filter((d) => d.text.trim().length > 0);
-    
     // Require at least 1 detail row with non-empty text
     if (validDetails.length === 0) return "Please add at least one detail.";
-
+    if (hours == 0) return "Hours cannot be 0. Please enter the estimated hours for the task.";
+    // Project is required only for admins
+    if (isAdmin && !projectId) return "Please select a project.";
+    if (!startDate) return "Please select a start date.";
+    if (!dueDate) return "Please select a due date.";
+    if (startDate && dueDate && new Date(dueDate) < new Date(startDate)) {
+      return "Due date cannot be before start date.";
+    }
     // If hours > 4, require at least 3 task details
     if (hours >= 4 && validDetails.length < 3) {
       return `For tasks >= 4 hours, you must add at least 3 task details (currently ${validDetails.length}).`;
@@ -112,24 +223,21 @@ export default function AddTaskForm({ onAdded, queryClient: qc }: AddTaskFormPro
       if (m < 0 || m > 59) return `Detail ${i + 1}: minutes must be between 0 and 59.`;
       if (h < 0) return `Detail ${i + 1}: hours cannot be negative.`;
       if ((h ?? 0) === 0 && (m ?? 0) === 0) {
-          return `Detail ${i + 1}: duration must be > 0 (hours or minutes).`;
+        return `Detail ${i + 1}: duration must be > 0 (hours or minutes).`;
+      }
     }
-
-    }
-   
-
     // Check if total detail time matches the hours value
     if (hours > 0 && Math.abs(totalHoursFromDetails - hours) > 0.01) {
       return `Total detail time (${totalHoursFromDetails.toFixed(2)}h) must exactly match the hours value (${hours}h).`;
     }
 
     return "";
-  }, [details, hours, totalHoursFromDetails]);
-  
+  }, [details, hours, startDate, dueDate, totalHoursFromDetails, projectId, isAdmin]);
+
   function toHHMM(hours: number, minutes: number) {
-  const h = Math.max(0, Math.floor(hours || 0));
-  const m = Math.min(59, Math.max(0, Math.floor(minutes || 0)));
-  return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+    const h = Math.max(0, Math.floor(hours || 0));
+    const m = Math.min(59, Math.max(0, Math.floor(minutes || 0)));
+    return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -154,8 +262,21 @@ export default function AddTaskForm({ onAdded, queryClient: qc }: AddTaskFormPro
       const payload: CreateTaskRequest = {
         taskName: taskName.trim(),
         hours: hours,
-        details : cleanedDetails,
+        details: cleanedDetails,
+        startDate,
+        dueDate,
+        status,
       };
+
+      // Only include projectId if it's selected
+      if (projectId) {
+        payload.projectId = projectId;
+      }
+
+      // Only include assignedTo if admin has selected a user
+      if (isAdmin && assignedTo) {
+        payload.assignedTo = assignedTo;
+      }
 
       const data = await tasksApi.createTask(payload);
 
@@ -170,6 +291,12 @@ export default function AddTaskForm({ onAdded, queryClient: qc }: AddTaskFormPro
       // Reset + close modal
       setTaskName("");
       setHours(0);
+      setStartDate("");
+      setDueDate("");
+      setStatus("to-do");
+      setAssignedTo("");
+      setProjectId("");
+      setProjects([]);
       setDetails([makeDetail()]);
       setOpen(false);
 
@@ -235,8 +362,55 @@ export default function AddTaskForm({ onAdded, queryClient: qc }: AddTaskFormPro
                 />
               </label>
 
+              {isAdmin && (
+                <>
+                  <label style={label}>
+                    Assign to user (optional for personal task)
+                    <select
+                      value={assignedTo}
+                      onChange={(e) => setAssignedTo(e.target.value)}
+                      style={input}
+                      disabled={loadingUsers}
+                    >
+                      <option value="">
+                        {loadingUsers ? "Loading users..." : "Select a user (or leave for personal task)"}
+                      </option>
+                      {users.map((user) => (
+                        <option key={user._id} value={user._id}>
+                          {user.fullName}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                </>
+              )}
+
               <label style={label}>
-                Hours 
+                Project {!isAdmin && <span style={{ fontSize: 12, color: "#6b7280" }}>(optional)</span>}
+                <select
+                  value={projectId}
+                  onChange={(e) => setProjectId(e.target.value)}
+                  required={isAdmin}
+                  style={input}
+                  disabled={loadingProjects}
+                >
+                  <option value="">
+                    {loadingProjects
+                      ? "Loading projects..."
+                      : projects.length === 0
+                      ? "No projects available"
+                      : isAdmin ? "Select a project" : "Select a project (optional)"}
+                  </option>
+                  {projects.map((project) => (
+                    <option key={project._id} value={project._id}>
+                      {project.projectName}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <label style={label}>
+                Hours
                 <input
                   type="number"
                   value={hours}
@@ -246,6 +420,43 @@ export default function AddTaskForm({ onAdded, queryClient: qc }: AddTaskFormPro
                   required
                   style={input}
                 />
+              </label>
+
+              <div style={dateRow}>
+                <label style={label}>
+                  Start date
+                  <input
+                    type="date"
+                    value={startDate}
+                    onChange={(e) => setStartDate(e.target.value)}
+                    required
+                    style={input}
+                  />
+                </label>
+
+                <label style={label}>
+                  Due date
+                  <input
+                    type="date"
+                    value={dueDate}
+                    onChange={(e) => setDueDate(e.target.value)}
+                    required
+                    style={input}
+                  />
+                </label>
+              </div>
+
+              <label style={label}>
+                Status
+                <select
+                  value={status}
+                  onChange={(e) => setStatus(e.target.value as TaskStatus)}
+                  style={input}
+                >
+                  <option value="to-do">to do</option>
+                  <option value="in-progress">in progress</option>
+                  <option value="completed">completed</option>
+                </select>
               </label>
 
               {/* Show total time from details */}
@@ -297,47 +508,47 @@ export default function AddTaskForm({ onAdded, queryClient: qc }: AddTaskFormPro
                     </div>
 
                     {/* Time range */}
-                   <div style={timeRow}>
-  <div style={{ display: "grid", gap: 6 }}>
-    <div style={{ fontSize: 14 }}>Duration</div>
+                    <div style={timeRow}>
+                      <div style={{ display: "grid", gap: 6 }}>
+                        <div style={{ fontSize: 14 }}>Duration</div>
 
-    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-      <label style={{ ...label, margin: 0 }}>
-        Hours
-        <input
-          type="number"
-          min={0}
-          step={1}
-          value={d.hours}
-          onChange={(e) => {
-            const next = Number(e.target.value);
-            updateDetail(idx, { hours: Number.isFinite(next) ? next : 0 });
-          }}
-          style={input}
-        />
-      </label>
+                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                          <label style={{ ...label, margin: 0 }}>
+                            Hours
+                            <input
+                              type="number"
+                              min={0}
+                              step={1}
+                              value={d.hours}
+                              onChange={(e) => {
+                                const next = Number(e.target.value);
+                                updateDetail(idx, { hours: Number.isFinite(next) ? next : 0 });
+                              }}
+                              style={input}
+                            />
+                          </label>
 
-      <label style={{ ...label, margin: 0 }}>
-        Minutes
-        <input
-          type="number"
-          min={0}
-          max={59}
-          step={1}
-          value={d.minutes}
-          onChange={(e) => {
-            let next = Number(e.target.value);
-            if (!Number.isFinite(next)) next = 0;
-            // clamp to 0..59
-            next = Math.max(0, Math.min(59, Math.floor(next)));
-            updateDetail(idx, { minutes: next });
-          }}
-          style={input}
-        />
-      </label>
-    </div>
-  </div>
-</div>
+                          <label style={{ ...label, margin: 0 }}>
+                            Minutes
+                            <input
+                              type="number"
+                              min={0}
+                              max={59}
+                              step={1}
+                              value={d.minutes}
+                              onChange={(e) => {
+                                let next = Number(e.target.value);
+                                if (!Number.isFinite(next)) next = 0;
+                                // clamp to 0..59
+                                next = Math.max(0, Math.min(59, Math.floor(next)));
+                                updateDetail(idx, { minutes: next });
+                              }}
+                              style={input}
+                            />
+                          </label>
+                        </div>
+                      </div>
+                    </div>
 
                   </div>
                 ))}
@@ -423,6 +634,7 @@ const label: React.CSSProperties = {
   display: "grid",
   gap: 6,
   fontSize: 14,
+  color: "black",
 };
 
 const input: React.CSSProperties = {
@@ -431,6 +643,13 @@ const input: React.CSSProperties = {
   padding: "10px 12px",
   fontSize: 14,
   outline: "none",
+  color: "black",
+};
+
+const dateRow: React.CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "1fr 1fr",
+  gap: 10,
 };
 
 const detailRow: React.CSSProperties = {
@@ -486,7 +705,7 @@ const errorText: React.CSSProperties = {
   fontSize: 13,
 };
 
-/* ---------- Icons ---------- */
+/* ---------- Icons ---------- */ 
 
 function PlusIcon() {
   return (

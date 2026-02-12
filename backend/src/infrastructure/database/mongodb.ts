@@ -1,5 +1,5 @@
 import mongoose from "mongoose";
-import { ENV } from "../../config/env";
+import { ENV } from "../../config/env.js";
 
 const uri = ENV.MONGODB_URI;
 if (!uri) throw new Error("Missing MONGODB_URI in environment variables");

@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction } from "express";
-import { verifyToken, JWTPayload } from "../infrastructure/database/jwt";
+import { verifyToken, JWTPayload } from "../infrastructure/database/jwt.js";
 
 // Extend Express Request type to include user info
 declare global {

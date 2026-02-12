@@ -1,52 +1,14 @@
 import bcrypt from "bcrypt";
-import { generateToken } from "../infrastructure/database/jwt";
-import { UserModel } from "../models/user.model";
-import type { LoginRequest, AuthResponse } from "../shared/types";
+import mongoose from "mongoose";
+import { generateToken } from "../infrastructure/database/jwt.js";
+import { UserModel } from "../models/user.model.js";
+import type { AuthResponse } from "../shared/types/index.js";
 
 export class AuthService {
   private userModel: UserModel;
 
   constructor() {
     this.userModel = new UserModel();
-  }
-
-  async register(data: LoginRequest): Promise<AuthResponse> {
-    // Check if user already exists
-    const existingUser = await this.userModel.findByEmail(data.email);
-    if (existingUser) {
-      throw new Error("User with this email already exists");
-    }
-
-    // Hash password with bcrypt
-    const saltRounds = 10;
-    const hashedPassword = await bcrypt.hash(data.password, saltRounds);
-
-    // Create user document
-    const userDoc = {
-      firstName: data.firstName.trim(),
-      lastName: data.lastName.trim(),
-      email: data.email.toLowerCase().trim(),
-      password: hashedPassword,
-      createdAt: new Date(),
-    };
-
-    const result = await this.userModel.create(userDoc);
-    const userId = result.insertedId.toString();
-
-    // Generate JWT token
-    const token = await generateToken(userId, result.user.email);
-
-    return {
-      success: true,
-      message: "User registered successfully",
-      data: {
-        token,
-        userId,
-        email: result.user.email,
-        firstName: result.user.firstName,
-        lastName: result.user.lastName,
-      },
-    };
   }
 
   async login(email: string, password: string): Promise<AuthResponse> {
@@ -67,6 +29,23 @@ export class AuthService {
     // Generate JWT token
     const token = await generateToken(user._id!.toString(), user.email);
 
+    // Determine user role
+    let userRole: "admin" | "user" = "user";
+    
+    if (user.role) {
+      try {
+        const db = mongoose.connection.db;
+        if (db) {
+          const adminRole = await db.collection("roles").findOne({ name: "admin" });
+          if (adminRole && user.role.toString() === adminRole._id.toString()) {
+            userRole = "admin";
+          }
+        }
+      } catch (error) {
+        console.error("Error checking admin role:", error);
+      }
+    }
+
     return {
       success: true,
       message: "Login successful",
@@ -76,6 +55,7 @@ export class AuthService {
         email: user.email,
         firstName: user.firstName,
         lastName: user.lastName,
+        role: userRole,
       },
     };
   }

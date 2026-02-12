@@ -14,6 +14,7 @@ export interface AuthResponse {
     email: string;
     firstName: string;
     lastName: string;
+    role: "admin" | "user";
   };
   message: string;
 }
@@ -24,10 +25,17 @@ export interface DetailBlock {
   time: string; // "HH:MM"
 }
 
+export type TaskStatus = "to-do" | "in-progress" | "completed";
+
 export interface CreateTaskRequest {
   taskName: string;
   hours: number;
   details: DetailBlock[];
+  status: TaskStatus;
+  projectId?: string;
+  assignedTo?: string; // User ID to assign the task
+  startDate?: string;
+  dueDate?: string;
 }
 
 export interface Task {
@@ -35,20 +43,13 @@ export interface Task {
   taskName: string;
   hours: number;
   details: DetailBlock[];
+  status: TaskStatus;
+  projectId?: string;
+  assignedTo?: string; // User ID the task is assigned to
+  startDate?: string;
+  dueDate?: string;
   createdAt: Date;
   updatedAt: Date;
-}
-
-export interface TaskResponse {
-  success: boolean;
-  data: Task;
-  message: string;
-}
-
-export interface CreateTaskResponse {
-  success: boolean;
-  data: Task;
-  message: string;
 }
 
 export interface PaginationMetadata {
@@ -68,7 +69,53 @@ export interface GetTasksResponse {
 }
 
 export interface TaskDetailsResponse {
+  ok: boolean;
+  details: DetailBlock[];
+  message?: string;
+}
+// ============ Project Types ============
+export interface CreateProjectRequest {
+  projectName: string;
+  projectDescription: string;
+  assignedUsers: string[]; // Array of user IDs
+}
+
+export interface Project {
+  _id: string;
+  projectName: string;
+  projectDescription: string;
+  assignedUsers: string[]; // Array of user IDs
+  createdBy: string; // Admin user ID
+  createdAt: Date;
+  updatedAt: Date;
+}
+// ============ User Management Types ============
+export interface CreateUserRequest {
+  firstName: string;
+  lastName: string;
+  email: string;
+  password: string;
+  role?: "admin" | "user"; // Optional, defaults to "user"
+}
+
+export interface User {
+  _id: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  role: "admin" | "user";
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface CreateUserResponse {
   success: boolean;
-  data: Task;
+  data: {
+    userId: string;
+    email: string;
+    firstName: string;
+    lastName: string;
+    role: "admin" | "user";
+  };
   message: string;
 }

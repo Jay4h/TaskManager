@@ -5,6 +5,7 @@ export interface UserDocument extends Document {
     lastName: string;
     email: string;
     password: string;
+    role?: mongoose.Types.ObjectId;
     createdAt: Date;
 }
 
@@ -14,6 +15,7 @@ const userSchema = new Schema<UserDocument>(
         lastName: { type: String, required: true },
         email: { type: String, required: true, unique: true, lowercase: true, trim: true },
         password: { type: String, required: true },
+        role: { type: Schema.Types.ObjectId, ref: "roles" },
     },
     {
         timestamps: true,
@@ -42,14 +44,6 @@ export class UserModel {
      */
     async findByEmail(email: string): Promise<UserDocument | null> {
         return this.model.findOne({ email: this.normalizeEmail(email) });
-    }
-
-    /**
-     * Check if a user exists by email
-     */
-    async existsByEmail(email: string): Promise<boolean> {
-        const user = await this.findByEmail(email);
-        return user !== null;
     }
 
     /**

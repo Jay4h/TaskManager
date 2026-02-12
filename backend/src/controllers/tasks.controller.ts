@@ -1,6 +1,6 @@
 import { Request, Response } from "express";
-import { TasksService } from "../services/tasks.service";
-import type { CreateTaskRequest } from "../shared/types";
+import { TasksService } from "../services/tasks.service.js";
+import type { CreateTaskRequest } from "../shared/types/index.js";
 
 export class TasksController {
   private tasksService: TasksService;
@@ -29,13 +29,34 @@ export class TasksController {
         return;
       }
 
-      if (body.hours < 0) {
-        res.status(400).json({ error: "hours must be >= 0" });
+      // projectId is optional (can be empty string or not provided)
+      if (body.projectId && typeof body.projectId !== "string") {
+        res.status(400).json({ error: "projectId must be a string" });
+        return;
+      }
+
+      if (body.assignedTo && typeof body.assignedTo !== "string") {
+        res.status(400).json({ error: "assignedTo must be a string (user ID)" });
         return;
       }
 
       if (!Array.isArray(body.details) || body.details.length === 0) {
         res.status(400).json({ error: "details must be a non-empty array" });
+        return;
+      }
+
+      if (body.status && !["to-do", "in-progress", "completed"].includes(body.status)) {
+        res.status(400).json({ error: "status must be one of: to-do, in-progress, completed" });
+        return;
+      }
+
+      if (body.startDate && typeof body.startDate !== "string") {
+        res.status(400).json({ error: "startDate must be a string" });
+        return;
+      }
+
+      if (body.dueDate && typeof body.dueDate !== "string") {
+        res.status(400).json({ error: "dueDate must be a string" });
         return;
       }
 
@@ -61,8 +82,9 @@ export class TasksController {
 
       const page = parseInt(req.query.page as string) || 1;
       const limit = parseInt(req.query.limit as string) || 10;
+      const filter = (req.query.filter as string) || "all"; // all, created, assigned
 
-      const result = await this.tasksService.getTasks(userId, page, limit);
+      const result = await this.tasksService.getTasks(userId, page, limit, filter);
       res.json(result);
     } catch (error) {
       console.error("Get tasks error:", error);
@@ -84,6 +106,68 @@ export class TasksController {
     } catch (error) {
       console.error("Get task details error:", error);
       if (error instanceof Error && error.message === "Invalid id") {
+        res.status(400).json({ error: error.message });
+      } else {
+        res.status(500).json({ error: "Server error" });
+      }
+    }
+  }
+
+  async updateTaskDetail(req: Request, res: Response): Promise<void> {
+    try {
+      const userId = req.user?.userId;
+      if (!userId) {
+        res.status(401).json({ error: "Unauthorized" });
+        return;
+      }
+
+      const { id, index } = req.params;
+      const { text, time } = req.body;
+
+      if (typeof text !== "string" || typeof time !== "string") {
+        res.status(400).json({ error: "text and time are required" });
+        return;
+      }
+
+      const detailIndex = parseInt(index, 10);
+      if (Number.isNaN(detailIndex)) {
+        res.status(400).json({ error: "Invalid detail index" });
+        return;
+      }
+
+      const result = await this.tasksService.updateTaskDetail(id, detailIndex, { text, time }, userId);
+      res.json(result);
+    } catch (error) {
+      console.error("Update task detail error:", error);
+      if (error instanceof Error) {
+        res.status(400).json({ error: error.message });
+      } else {
+        res.status(500).json({ error: "Server error" });
+      }
+    }
+  }
+
+  async updateTaskStatus(req: Request, res: Response): Promise<void> {
+    try {
+      const userId = req.user?.userId;
+      if (!userId) {
+        res.status(401).json({ error: "Unauthorized" });
+        return;
+      }
+
+      const { id } = req.params;
+      const { status } = req.body;
+
+      if (!status || !["to-do", "in-progress", "completed"].includes(status)) {
+        res.status(400).json({ error: "status must be one of: to-do, in-progress, completed" });
+        return;
+      }
+
+      const result = await this.tasksService.updateTaskStatus(id, status, userId);
+      res.json(result);
+    } catch (error) {
+      console.error("Update task status error:", error);
+      if (error instanceof Error) {
         res.status(400).json({ error: error.message });
       } else {
         res.status(500).json({ error: "Server error" });

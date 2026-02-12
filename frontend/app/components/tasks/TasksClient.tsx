@@ -28,7 +28,7 @@ export default function TasksClient() {
       const customEvent = e as CustomEvent<{ isLoggedIn: boolean }>
       const hasToken = customEvent.detail.isLoggedIn;
       setIsLoggedIn(hasToken);
-      
+
       if (!hasToken) {
         queryClient.clear();
       }

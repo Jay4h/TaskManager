@@ -1,6 +1,5 @@
 import { Request, Response } from "express";
-import { AuthService } from "../services/auth.service";
-import type { LoginRequest } from "../shared/types";
+import { AuthService } from "../services/auth.service.js";
 
 export class AuthController {
   private authService: AuthService;
@@ -9,27 +8,9 @@ export class AuthController {
     this.authService = new AuthService();
   }
 
-  async register(req: Request, res: Response): Promise<void> {
-    try {
-      const body = req.body as LoginRequest;
-      const result = await this.authService.register(body);
-      res.status(201).json(result);
-    } catch (error) {
-      console.error("Auth register error:", error);
-      if (error instanceof Error && error.message.includes("already exists")) {
-        res.status(400).json({ error: error.message });
-      } else {
-        res.status(500).json({ error: "Server error" });
-      }
-    }
-  }
-
   async login(req: Request, res: Response): Promise<void> {
     try {
-      
       const body = req.body as { email: string; password: string };
-      // console.log(req)
-      // console.log(body)
       const result = await this.authService.login(body.email, body.password);
       res.status(200).json(result);
     } catch (error) {
