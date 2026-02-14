@@ -6,9 +6,22 @@ import tasksRoutes from "./routes/tasks.routes.js";
 import projectsRoutes from "./routes/projects.routes.js";
 import usersRoutes from "./routes/users.routes.js";
 import dashboardRoutes from "./routes/dashboard.routes.js";
+import connectDB from "./infrastructure/database/mongodb.js";
 
 export function createApp() {
   const app = express();
+  
+  // Database connection middleware for serverless
+  app.use(async (_req, _res, next) => {
+    try {
+      await connectDB();
+      next();
+    } catch (error) {
+      console.error("Database connection error:", error);
+      next(error);
+    }
+  });
+  
   // Middleware
   app.use(cors(CORS_CONFIG));
   app.use(express.json());
@@ -25,3 +38,7 @@ export function createApp() {
   });
   return app;
 }
+
+// Export app instance for Vercel serverless deployment
+const app = createApp();
+export default app;

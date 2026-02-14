@@ -56,7 +56,19 @@ export class TasksService {
       throw new Error("Database connection failed");
     }
 
-    // If assignedTo is not provided, default to the creator (personal task)
+    // Check for admin privileges to determine assignment restrictions
+    const isAdmin = await this.isUserAdmin(userId);
+
+    // If assignedTo is not provided, check admin requirement
+    if (!data.assignedTo) {
+      if (isAdmin) {
+        // Admins must specify assignedTo
+        throw new Error("Admins must specify assignedTo when creating tasks");
+      }
+      // Regular users default to themselves
+    }
+
+    // If assignedTo is provided, validate it and check admin restrictions
     const assignedToUser = data.assignedTo || userId;
 
     // Validate assignedTo user exists
@@ -69,19 +81,14 @@ export class TasksService {
       throw new Error("Assigned user not found");
     }
 
-    // Check for admin privileges to determine assignment restrictions
-    const isAdmin = await this.isUserAdmin(userId);
+    // If admin and assignedTo is provided, they cannot assign to themselves
+    if (isAdmin && assignedToUser === userId) {
+      throw new Error("Admins cannot assign tasks to themselves");
+    }
 
-    // If admin, they cannot assign tasks to themselves
-    if (isAdmin) {
-      if (assignedToUser === userId) {
-        throw new Error("Admins cannot assign tasks to themselves");
-      }
-    } else {
-      // Regular users can only assign tasks to themselves
-      if (assignedToUser !== userId) {
-        throw new Error("You can only assign tasks to yourself");
-      }
+    // Regular users can only assign to themselves
+    if (!isAdmin && assignedToUser !== userId) {
+      throw new Error("You can only assign tasks to yourself");
     }
 
     // Check if task name already exists for this user

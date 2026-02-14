@@ -2,7 +2,7 @@ import bcrypt from "bcrypt";
 import mongoose from "mongoose";
 import { UserModel } from "../models/user.model.js";
 import type { CreateUserRequest, CreateUserResponse } from "../shared/types/index.js";
-import { ForbiddenError, BadRequestError, NotFoundError } from "../shared/types/index.js";
+import { ForbiddenError, BadRequestError, NotFoundError, InternalServerError } from "../shared/types/index.js";
 
 export class UsersService {
     private userModel: UserModel;
@@ -141,7 +141,7 @@ export class UsersService {
 
         const db = mongoose.connection.db;
         if (!db) {
-            throw new BadRequestError("Database connection failed");
+            throw new InternalServerError("Database connection failed");
         }
 
         const skip = (page - 1) * limit;
@@ -211,7 +211,12 @@ export class UsersService {
 
         const db = mongoose.connection.db;
         if (!db) {
-            throw new BadRequestError("Database connection failed");
+            throw new InternalServerError("Database connection failed");
+        }
+
+        // Validate userId before constructing ObjectId
+        if (!mongoose.Types.ObjectId.isValid(userId)) {
+            throw new NotFoundError("User not found");
         }
 
         const user = await db.collection("users").findOne({ _id: new mongoose.Types.ObjectId(userId) });
