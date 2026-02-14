@@ -87,6 +87,20 @@ export default function TaskTable({ initialFilter, projectFilter, assignedToFilt
     staleTime: 5 * 60 * 1000,
   });
 
+  // Calculate filtered tasks for correct pagination display
+  const filteredTasks = useMemo(() => {
+    let filtered = data?.data || [];
+    if (projectFilter) {
+      filtered = filtered.filter(t => t.projectId === projectFilter);
+    }
+    if (assignedToFilter) {
+      filtered = filtered.filter(t => t.assignedTo === assignedToFilter);
+    }
+    return filtered;
+  }, [data?.data, projectFilter, assignedToFilter]);
+
+  const displayTotal = filteredTasks.length > 0 ? filteredTasks.length : (data?.pagination?.totalItems || 0);
+
   // Click outside handler for custom dropdowns
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -227,7 +241,11 @@ export default function TaskTable({ initialFilter, projectFilter, assignedToFilt
 
   const isDueDateOverdue = (dateString?: string) => {
     if (!dateString) return false;
-    return new Date(dateString) < new Date();
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const dueDate = new Date(dateString);
+    dueDate.setHours(0, 0, 0, 0);
+    return dueDate < today;
   };
 
   // Start inline add
@@ -290,13 +308,20 @@ export default function TaskTable({ initialFilter, projectFilter, assignedToFilt
   // Selected assignee name - ensure type safety
   const selectedAssignee = useMemo(() => {
     if (!newTaskAssignee) return undefined;
-    return users.find(u => String(u._id) === String(newTaskAssignee));
-  }, [users, newTaskAssignee]);
+    const assignee = users.find(u => String(u._id) === String(newTaskAssignee));
+    if (assignee) return assignee;
+    // For non-admins when users query is disabled, use current user
+    if (!isAdmin && users.length === 0 && newTaskAssignee === currentUserId) {
+      return { _id: currentUserId, firstName: currentUserId, lastName: "", fullName: currentUserId };
+    }
+    return undefined;
+  }, [users, newTaskAssignee, currentUserId, isAdmin]);
 
   // Helper to format hours:minutes to "HH:MM"
   const toHHMM = (h: number, m: number) => {
-    const hh = Math.max(0, Math.floor(h));
-    const mm = Math.min(59, Math.max(0, Math.floor(m)));
+    const totalMinutes = Math.max(0, Math.floor(h) * 60 + Math.floor(m));
+    const hh = Math.floor(totalMinutes / 60);
+    const mm = totalMinutes % 60;
     return `${String(hh).padStart(2, "0")}:${String(mm).padStart(2, "0")}`;
   };
 
@@ -353,7 +378,7 @@ export default function TaskTable({ initialFilter, projectFilter, assignedToFilt
     if (totalEstHours >= 4 && subtasks.length < 3) {
       return "For tasks >= 4 hours, at least 3 subtasks are required";
     }
-    if (totalEstHours === 3 && subtasks.length < 2) {
+    if (totalEstHours >= 3 && totalEstHours < 4 && subtasks.length < 2) {
       return "For tasks = 3 hours, at least 2 subtasks are required";
     }
 
@@ -401,9 +426,7 @@ export default function TaskTable({ initialFilter, projectFilter, assignedToFilt
       setCurrentSubtaskHours("");
       setCurrentSubtaskMinutes("");
       setAddingInGroup(null);
-
-      // Keep input focused for rapid entry
-      setTimeout(() => newTaskInputRef.current?.focus(), 50);
+      // Don't focus on unmounted input - form is being closed
     } catch (error) {
       let errorMsg = "Failed to create task";
       if (error && typeof error === 'object') {
@@ -1199,12 +1222,12 @@ export default function TaskTable({ initialFilter, projectFilter, assignedToFilt
       </div>
 
       {/* Pagination */}
-      {pagination.totalItems > 0 && (
+      {displayTotal > 0 && (
         <div className="mt-4 flex items-center justify-between text-xs text-[var(--text-secondary)]">
           <div className="flex items-center gap-3">
             <span>
               Showing {(pagination.currentPage - 1) * pagination.itemsPerPage + 1}–
-              {Math.min(pagination.currentPage * pagination.itemsPerPage, pagination.totalItems)} of {pagination.totalItems}
+              {Math.min(pagination.currentPage * pagination.itemsPerPage, displayTotal)} of {displayTotal}
             </span>
             <div className="flex items-center gap-1.5">
               <span className="text-[var(--text-muted)]">Rows per page:</span>
@@ -1268,6 +1291,21 @@ function TaskRow({ task, expandedTaskId, setExpandedTaskId, formatDueDate, isDue
   const [editError, setEditError] = useState("");
   const [statusDropdownOpen, setStatusDropdownOpen] = useState(false);
   const [updatingStatus, setUpdatingStatus] = useState(false);
+  const statusDropdownRef = useRef<HTMLDivElement>(null);
+
+  // Click-outside handler for status dropdown
+  useEffect(() => {
+    if (!statusDropdownOpen) return;
+    
+    const handleClickOutside = (event: MouseEvent) => {
+      if (statusDropdownRef.current && !statusDropdownRef.current.contains(event.target as Node)) {
+        setStatusDropdownOpen(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [statusDropdownOpen]);
 
   const { data, isLoading: detailsLoading, isError: detailsError } = useQuery({
     queryKey: ["task-details", lookupId],
@@ -1415,7 +1453,7 @@ function TaskRow({ task, expandedTaskId, setExpandedTaskId, formatDueDate, isDue
         </div>
 
         {/* Status */}
-        <div className="relative" onClick={(e) => e.stopPropagation()}>
+        <div className="relative" onClick={(e) => e.stopPropagation()} ref={statusDropdownRef}>
           <button
             onClick={() => setStatusDropdownOpen(!statusDropdownOpen)}
             disabled={updatingStatus}

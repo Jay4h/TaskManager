@@ -512,7 +512,7 @@ export default function Sidebar({ userRole }: SidebarProps) {
                       className="flex items-center gap-3 w-full p-2 rounded-lg hover:bg-[var(--bg-surface-2)] transition-all"
                     >
                       <div className="flex h-7 w-7 items-center justify-center rounded-full bg-gray-800 text-white text-[10px] font-bold flex-shrink-0">
-                        {user.firstName.charAt(0)}{user.lastName.charAt(0)}
+                        {user.firstName?.charAt(0)}{user.lastName?.charAt(0)}
                       </div>
                       <div className="flex-1 text-left overflow-hidden">
                         <p className="text-[12px] font-medium text-[var(--text-primary)] truncate">

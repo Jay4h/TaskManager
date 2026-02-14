@@ -110,7 +110,7 @@ body {
   border-radius: 10px;
 }
 
-*:hover ::-webkit-scrollbar-thumb,
+.ck-scrollbar:hover ::-webkit-scrollbar-thumb,
 ::-webkit-scrollbar-thumb:hover {
   background-color: #CBD5E1;
 }
@@ -327,6 +327,11 @@ select:-webkit-autofill:focus {
 
 .claude-btn-quiet:hover {
   background-color: rgba(0, 0, 0, 0.04);
+  color: var(--text-primary);
+}
+
+.dark .claude-btn-quiet:hover {
+  background-color: rgba(255, 255, 255, 0.04);
   color: var(--text-primary);
 }
 

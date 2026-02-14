@@ -227,7 +227,7 @@ export default function LoginForm() {
                         placeholder="you@example.com"
                         required
                         className="claude-input w-full"
-                        aria-required
+                        aria-required={true}
                     />
                 </div>
 

@@ -129,7 +129,7 @@ export default function AddTaskForm({ onAdded, queryClient: qc }: AddTaskFormPro
     const validDetails = details.filter((d) => d.text.trim().length > 0);
     if (validDetails.length === 0) return "Please add at least one detail.";
     if (hours == 0) return "Hours cannot be 0. Please enter the estimated hours for the task.";
-    if (isAdmin && !assignedTo) return "Please select a user to assign the task.";
+    if (isAdmin && !assignedTo) return "Assignment is required for admins (choose a user).";
     if (isAdmin && !projectId) return "Please select a project.";
     if (!startDate) return "Please select a start date.";
     if (!dueDate) return "Please select a due date.";

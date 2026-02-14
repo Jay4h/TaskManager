@@ -9,7 +9,7 @@ import { projectsApi } from "../../../src/api/projects.api";
 export default function TasksClient() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
-  const [isAdmin, setIsAdmin] = useState(false);
+  const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
   const queryClient = useQueryClient();
   const searchParams = useSearchParams();
 
@@ -25,13 +25,15 @@ export default function TasksClient() {
       } catch {
         setIsAdmin(false);
       }
+    } else {
+      setIsAdmin(false);
     }
   }, []);
 
   const { data: projectsData } = useQuery({
     queryKey: ["projects", isAdmin ? "admin" : "user"],
     queryFn: isAdmin ? projectsApi.getAllProjects : projectsApi.getMyProjects,
-    enabled: !!projectParam,
+    enabled: projectParam !== "" && isAdmin !== null,
     staleTime: 5 * 60 * 1000,
   });
 

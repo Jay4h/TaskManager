@@ -56,6 +56,12 @@ export default function ProjectsClient({ userRole }: { userRole?: "admin" | "use
       setNewProjectUsers([]);
       setProjectError("");
     },
+    onError: (error: any) => {
+      const errorMessage = error?.response?.data?.error || error?.message || "Failed to create project";
+      setProjectError(errorMessage);
+      setIsAdding(false);
+      console.error("Failed to create project:", error);
+    },
   });
 
   const handleCreateProject = () => {
@@ -71,9 +77,15 @@ export default function ProjectsClient({ userRole }: { userRole?: "admin" | "use
     }
 
     // Check if admin is trying to assign the project to themselves
-    if (isAdmin && newProjectUsers.includes(currentUserId || "")) {
-      setProjectError("You cannot assign a project to yourself");
-      return;
+    if (isAdmin) {
+      if (!currentUserId) {
+        setProjectError("Unable to verify current user");
+        return;
+      }
+      if (newProjectUsers.includes(currentUserId)) {
+        setProjectError("You cannot assign a project to yourself");
+        return;
+      }
     }
 
     createProjectMutation.mutate({

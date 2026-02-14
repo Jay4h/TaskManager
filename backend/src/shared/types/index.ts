@@ -121,4 +121,4 @@ export interface CreateUserResponse {
 }
 
 // ============ Error Types ============
-export { ForbiddenError, BadRequestError, NotFoundError } from "./errors.js";
+export { ForbiddenError, BadRequestError, NotFoundError, InternalServerError } from "./errors.js";

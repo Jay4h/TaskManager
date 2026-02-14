@@ -63,6 +63,14 @@ export default function UsersClient() {
       alert("Email is required");
       return;
     }
+
+    // Email format validation
+    const emailRegex = /\S+@\S+\.\S+/;
+    if (!emailRegex.test(newEmail.trim())) {
+      alert("Please enter a valid email address");
+      return;
+    }
+
     if (!newPassword || newPassword.length < 6) {
       alert("Password must be at least 6 characters");
       return;
@@ -192,7 +200,7 @@ export default function UsersClient() {
                   {/* Name */}
                   <div className="flex items-center gap-3 pl-4">
                     <div className="w-7 h-7 rounded-full bg-gray-700 text-white flex items-center justify-center text-[10px] font-bold flex-shrink-0">
-                      {user.firstName.charAt(0)}{user.lastName.charAt(0)}
+                      {user.firstName?.charAt(0)}{user.lastName?.charAt(0)}
                     </div>
                     <span className="truncate font-medium text-[var(--text-primary)]">{user.firstName} {user.lastName}</span>
                   </div>
