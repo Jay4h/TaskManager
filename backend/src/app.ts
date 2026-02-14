@@ -11,6 +11,10 @@ import connectDB from "./infrastructure/database/mongodb.js";
 export function createApp() {
   const app = express();
   
+  // Middleware - CORS and body parser must come first
+  app.use(cors(CORS_CONFIG));
+  app.use(express.json());
+  
   // Database connection middleware for serverless
   app.use(async (_req, _res, next) => {
     try {
@@ -22,9 +26,6 @@ export function createApp() {
     }
   });
   
-  // Middleware
-  app.use(cors(CORS_CONFIG));
-  app.use(express.json());
   // Routes
   app.use("/api/auth", authRoutes);
   app.use("/api/tasks", tasksRoutes);

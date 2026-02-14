@@ -12,6 +12,11 @@ export class AuthService {
   }
 
   async login(email: string, password: string): Promise<AuthResponse> {
+    // Validate input
+    if (!email || !password) {
+      throw new Error("Email and password are required");
+    }
+    
     const normalizedEmail = email.toLowerCase().trim();
 
     // Find user by email
