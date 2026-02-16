@@ -323,8 +323,7 @@ export default function Sidebar({ userRole }: SidebarProps) {
   };
 
   const navigateTo = (url: string) => {
-    // Direct navigation - avoids RSC calls but causes full page reload
-    // Since all pages are client components, this works fine
+    // Use window.location to completely avoid RSC framework calls
     window.location.href = url;
   };
 

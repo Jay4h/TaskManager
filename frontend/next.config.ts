@@ -8,11 +8,6 @@ const nextConfig: NextConfig = {
     "localhost",
     "127.0.0.1",
   ],
-  // Disable automatic static optimization to reduce RSC calls
-  experimental: {
-    appDir: true,
-  },
-  // Disable prefetching
   reactStrictMode: true,
 };
 
