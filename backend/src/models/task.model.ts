@@ -58,6 +58,11 @@ const taskSchema = new Schema<TaskDocument>(
 // Create indexes
 taskSchema.index({ taskName: 1 });
 taskSchema.index({ createdAt: -1 });
+taskSchema.index({ userId: 1, status: 1 }); // Compound index for user tasks by status
+taskSchema.index({ projectId: 1, status: 1 }); // Compound index for project tasks by status
+taskSchema.index({ assignedTo: 1, status: 1 }); // Compound index for assigned tasks by status
+taskSchema.index({ projectId: 1, assignedTo: 1 }); // Compound index for filtering by project and user
+taskSchema.index({ dueDate: 1 }); // For sorting by due date
 
 const Task = mongoose.models.TaskManager || mongoose.model<TaskDocument>("TaskManager", taskSchema);
 

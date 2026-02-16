@@ -23,6 +23,12 @@ const userSchema = new Schema<UserDocument>(
     }
 );
 
+// Create indexes for better query performance
+userSchema.index({ email: 1 }); // For finding users by email (unique constraint already creates index)
+userSchema.index({ role: 1 }); // For filtering users by role
+userSchema.index({ createdAt: -1 }); // For sorting by creation date
+userSchema.index({ firstName: 1, lastName: 1 }); // For searching by name
+
 const User = mongoose.models.users || mongoose.model<UserDocument>("users", userSchema);
 
 export class UserModel {
