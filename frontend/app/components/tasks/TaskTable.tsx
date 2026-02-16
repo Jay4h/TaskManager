@@ -538,7 +538,7 @@ export default function TaskTable({ initialFilter, projectFilter, assignedToFilt
         <div className="overflow-x-auto">
           <div className="min-w-[900px]">
             {/* Table Header */}
-            <div className="grid grid-cols-[1fr_80px_140px_140px_120px_130px_40px] gap-2 items-center px-8 py-3 border-b border-[var(--border-subtle)] bg-[var(--bg-canvas)] text-[12px] font-semibold text-[var(--text-muted)] uppercase tracking-wide">
+            <div className="grid grid-cols-[1fr_120px_140px_140px_120px_130px_40px] gap-2 items-center px-8 py-3 border-b border-[var(--border-subtle)] bg-[var(--bg-canvas)] text-[12px] font-semibold text-[var(--text-muted)] uppercase tracking-wide">
               <div>Name</div>
               <div>Hours</div>
               <div>Project</div>
@@ -618,7 +618,7 @@ export default function TaskTable({ initialFilter, projectFilter, assignedToFilt
                           {addingInGroup === key ? (
                             <div className="relative z-20 flex flex-col border-b border-[var(--border-subtle)] bg-[var(--bg-canvas)] p-2 gap-2">
                               {/* Row 1: Main Task Info */}
-                              <div className="grid grid-cols-[1fr_80px_140px_140px_120px_130px_40px] gap-2 items-center">
+                              <div className="grid grid-cols-[1fr_120px_140px_140px_120px_130px_40px] gap-2 items-center">
                                 <div className="flex items-center gap-3 pl-2">
                                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#b0b0b0" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" strokeDasharray="2 4">
                                     <circle cx="12" cy="12" r="9" />
@@ -674,7 +674,7 @@ export default function TaskTable({ initialFilter, projectFilter, assignedToFilt
                                     <div className="absolute z-50 top-full left-0 mt-1 w-48 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-canvas)] shadow-lg py-1 max-h-48 overflow-y-auto">
                                       <button
                                         onClick={() => { setNewTaskProject(""); setProjectDropdownOpen(false); }}
-                                        className={`w-full flex items-center gap-2 px-3 py-1.5 text-left text-[13px] hover:bg-[var(--bg-surface)] transition-colors ${!newTaskProject ? "bg-blue-50 text-blue-700" : "text-[var(--text-secondary)]"}`}
+                                        className={`w-full flex items-center gap-2 px-3 py-1.5 text-left text-[13px] hover:bg-[var(--bg-surface)] transition-colors ${!newTaskProject ? "bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400" : "text-[var(--text-secondary)]"}`}
                                       >
                                         No project
                                       </button>
@@ -682,7 +682,7 @@ export default function TaskTable({ initialFilter, projectFilter, assignedToFilt
                                         <button
                                           key={p._id}
                                           onClick={() => { setNewTaskProject(p._id); setProjectDropdownOpen(false); }}
-                                          className={`w-full flex items-center gap-2 px-3 py-1.5 text-left text-[13px] hover:bg-[var(--bg-surface)] transition-colors ${newTaskProject === p._id ? "bg-blue-50 text-blue-700" : "text-[var(--text-secondary)]"}`}
+                                          className={`w-full flex items-center gap-2 px-3 py-1.5 text-left text-[13px] hover:bg-[var(--bg-surface)] transition-colors ${newTaskProject === p._id ? "bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400" : "text-[var(--text-secondary)]"}`}
                                         >
                                           <span className="truncate">{p.projectName}</span>
                                         </button>
@@ -713,7 +713,7 @@ export default function TaskTable({ initialFilter, projectFilter, assignedToFilt
                                         <div className="absolute z-50 top-full left-0 mt-1 w-48 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-canvas)] shadow-lg py-1 max-h-48 overflow-y-auto">
                                           <button
                                             onClick={() => { setNewTaskAssignee(""); setAssigneeDropdownOpen(false); }}
-                                            className={`w-full flex items-center gap-2 px-3 py-1.5 text-left text-[12px] hover:bg-[var(--bg-surface)] transition-colors ${!newTaskAssignee ? "bg-blue-50 text-blue-700" : "text-[var(--text-secondary)]"}`}
+                                            className={`w-full flex items-center gap-2 px-3 py-1.5 text-left text-[12px] hover:bg-[var(--bg-surface)] transition-colors ${!newTaskAssignee ? "bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400" : "text-[var(--text-secondary)]"}`}
                                           >
                                             Unassigned
                                           </button>
@@ -721,7 +721,7 @@ export default function TaskTable({ initialFilter, projectFilter, assignedToFilt
                                             <button
                                               key={u._id}
                                               onClick={() => { setNewTaskAssignee(u._id); setAssigneeDropdownOpen(false); }}
-                                              className={`w-full flex items-center gap-2 px-3 py-1.5 text-left text-[12px] hover:bg-[var(--bg-surface)] transition-colors ${newTaskAssignee === u._id ? "bg-blue-50 text-blue-700" : "text-[var(--text-secondary)]"}`}
+                                              className={`w-full flex items-center gap-2 px-3 py-1.5 text-left text-[12px] hover:bg-[var(--bg-surface)] transition-colors ${newTaskAssignee === u._id ? "bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400" : "text-[var(--text-secondary)]"}`}
                                             >
                                               <div className="w-5 h-5 rounded-full bg-gray-700 text-white flex items-center justify-center text-[8px] font-bold flex-shrink-0">
                                                 {u.fullName?.charAt(0)}
@@ -749,25 +749,25 @@ export default function TaskTable({ initialFilter, projectFilter, assignedToFilt
 
                                 {/* Status */}
                                 <div className="relative" ref={statusDropdownRefInline}>
-                                  <div className="inline-flex items-center rounded-full border border-gray-200 bg-[var(--bg-canvas)] overflow-hidden shadow-sm">
+                                  <div className="inline-flex items-center rounded-full border border-[var(--border-subtle)] bg-[var(--bg-canvas)] overflow-hidden shadow-sm">
                                     <button
                                       onClick={() => { setStatusDropdownOpenInline(!statusDropdownOpenInline); setProjectDropdownOpen(false); setAssigneeDropdownOpen(false); }}
-                                      className="flex items-center gap-1 px-2.5 py-1 text-[10px] font-bold tracking-wide uppercase hover:bg-gray-50 transition-colors"
+                                      className="flex items-center gap-1 px-2.5 py-1 text-[10px] font-bold tracking-wide uppercase hover:bg-[var(--bg-surface)] transition-colors"
                                       style={{ color: getInlineStatusColor(newTaskStatus) }}
                                     >
                                       {getInlineStatusLabel(newTaskStatus)}
                                     </button>
                                     <button
                                       onClick={cycleNextStatus}
-                                      className="flex items-center justify-center w-5 h-full border-l border-gray-200 hover:bg-gray-50 transition-colors"
+                                      className="flex items-center justify-center w-5 h-full border-l border-[var(--border-subtle)] hover:bg-[var(--bg-surface)] transition-colors"
                                     >
-                                      <svg width="8" height="8" viewBox="0 0 24 24" fill="currentColor" className="text-gray-400">
+                                      <svg width="8" height="8" viewBox="0 0 24 24" fill="currentColor" className="text-[var(--text-muted)]">
                                         <path d="M8 5v14l11-7z" />
                                       </svg>
                                     </button>
                                     <button
                                       onClick={() => setNewTaskStatus("completed")}
-                                      className="flex items-center justify-center w-6 h-full border-l border-gray-200 hover:bg-green-50 transition-colors"
+                                      className="flex items-center justify-center w-6 h-full border-l border-[var(--border-subtle)] hover:bg-green-50 dark:hover:bg-green-900/30 transition-colors"
                                     >
                                       <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke={newTaskStatus === "completed" ? "#00b884" : "#a0a0a0"} strokeWidth="3"><polyline points="20 6 9 17 4 12" /></svg>
                                     </button>
@@ -778,7 +778,7 @@ export default function TaskTable({ initialFilter, projectFilter, assignedToFilt
                                         <button
                                           key={s}
                                           onClick={() => { setNewTaskStatus(s); setStatusDropdownOpenInline(false); }}
-                                          className={`w-full flex items-center gap-2 px-3 py-1.5 text-left text-[11px] font-bold tracking-wide uppercase hover:bg-[var(--bg-surface)] transition-colors ${newTaskStatus === s ? "bg-blue-50" : ""}`}
+                                          className={`w-full flex items-center gap-2 px-3 py-1.5 text-left text-[11px] font-bold tracking-wide uppercase hover:bg-[var(--bg-surface)] transition-colors ${newTaskStatus === s ? "bg-blue-50 dark:bg-blue-900/30" : ""}`}
                                           style={{ color: getInlineStatusColor(s) }}
                                         >
                                           <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: getInlineStatusColor(s) }} />
@@ -825,7 +825,7 @@ export default function TaskTable({ initialFilter, projectFilter, assignedToFilt
                               </div>
 
                               {/* Row 2: Subtasks */}
-                              <div className="ml-8 pl-4 border-l-2 border-dashed border-gray-200">
+                              <div className="ml-8 pl-4 border-l-2 border-dashed border-[var(--border-subtle)]">
                                 <div className="flex items-center justify-between mb-2">
                                   <span className="text-[11px] font-semibold text-[var(--text-muted)] uppercase tracking-wide">Subtasks</span>
                                   <span className={`text-[10px] ${Math.abs(totalSubtaskHours - totalEstHours) > 0.01 && totalEstHours > 0 ? "text-red-500 font-bold" : "text-green-600"}`}>
@@ -836,7 +836,7 @@ export default function TaskTable({ initialFilter, projectFilter, assignedToFilt
                                 {/* Subtask List */}
                                 <div className="space-y-1 mb-2">
                                   {subtasks.map((st, idx) => (
-                                    <div key={idx} className="flex items-center gap-2 text-[12px] bg-white border border-[var(--border-subtle)] px-2 py-1 rounded-md">
+                                    <div key={idx} className="flex items-center gap-2 text-[12px] bg-[var(--bg-canvas)] border border-[var(--border-subtle)] px-2 py-1 rounded-md">
                                       <span className="flex-1 text-[var(--text-primary)]">{st.text}</span>
                                       <span className="text-[var(--text-secondary)] font-mono">{toHHMM(st.hours, st.minutes)}</span>
                                       <button onClick={() => removeSubtask(idx)} className="text-red-400 hover:text-red-600">
@@ -853,7 +853,7 @@ export default function TaskTable({ initialFilter, projectFilter, assignedToFilt
                                     value={currentSubtaskText}
                                     onChange={(e) => setCurrentSubtaskText(e.target.value)}
                                     placeholder="Subtask description"
-                                    className="flex-1 bg-white border border-[var(--border-subtle)] rounded-md px-2 py-1 text-[12px] outline-none"
+                                    className="flex-1 bg-[var(--bg-canvas)] border border-[var(--border-subtle)] rounded-md px-2 py-1 text-[12px] text-[var(--text-primary)] outline-none"
                                     onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addSubtask(); } }}
                                   />
                                   <div className="flex items-center gap-1">
@@ -863,7 +863,7 @@ export default function TaskTable({ initialFilter, projectFilter, assignedToFilt
                                       onChange={(e) => setCurrentSubtaskHours(e.target.value)}
                                       placeholder="Hr"
                                       min="0"
-                                      className="w-[35px] bg-white border border-[var(--border-subtle)] rounded-md px-1 py-1 text-[12px] outline-none text-center"
+                                      className="w-[35px] bg-[var(--bg-canvas)] border border-[var(--border-subtle)] rounded-md px-1 py-1 text-[12px] text-[var(--text-primary)] outline-none text-center"
                                       onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addSubtask(); } }}
                                     />
                                     <span className="text-[var(--text-muted)] text-[10px]">:</span>
@@ -874,14 +874,14 @@ export default function TaskTable({ initialFilter, projectFilter, assignedToFilt
                                       placeholder="Min"
                                       min="0"
                                       max="59"
-                                      className="w-[35px] bg-white border border-[var(--border-subtle)] rounded-md px-1 py-1 text-[12px] outline-none text-center"
+                                      className="w-[35px] bg-[var(--bg-canvas)] border border-[var(--border-subtle)] rounded-md px-1 py-1 text-[12px] text-[var(--text-primary)] outline-none text-center"
                                       onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addSubtask(); } }}
                                     />
                                   </div>
                                   <button
                                     onClick={addSubtask}
                                     disabled={!currentSubtaskText.trim() || (parseInt(currentSubtaskHours || "0") === 0 && parseInt(currentSubtaskMinutes || "0") === 0)}
-                                    className="px-2 py-1 bg-blue-50 text-blue-600 text-[11px] font-medium rounded-md hover:bg-blue-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                                    className="px-2 py-1 bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 text-[11px] font-medium rounded-md hover:bg-blue-100 dark:hover:bg-blue-900/50 disabled:opacity-50 disabled:cursor-not-allowed"
                                   >
                                     Add
                                   </button>
@@ -894,7 +894,7 @@ export default function TaskTable({ initialFilter, projectFilter, assignedToFilt
                                   </div>
                                 )}
                                 {submissionError && (
-                                  <div className="mt-2 text-[11px] text-red-600 font-medium bg-red-50 p-2 rounded border border-red-200">
+                                  <div className="mt-2 text-[11px] text-red-600 dark:text-red-400 font-medium bg-red-50 dark:bg-red-900/30 p-2 rounded border border-red-200 dark:border-red-800">
                                     Error: {submissionError}
                                   </div>
                                 )}
@@ -933,7 +933,7 @@ export default function TaskTable({ initialFilter, projectFilter, assignedToFilt
                   {addingInGroup === "to-do" ? (
                     <div className="relative z-20 flex flex-col border-b border-[var(--border-subtle)] bg-[var(--bg-canvas)] p-2 gap-2">
                       {/* Row 1: Main Task Info */}
-                      <div className="grid grid-cols-[1fr_80px_140px_140px_120px_130px_40px] gap-2 items-center">
+                      <div className="grid grid-cols-[1fr_120px_140px_140px_120px_130px_40px] gap-2 items-center">
                         <div className="flex items-center gap-3 pl-2">
                           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#b0b0b0" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" strokeDasharray="2 4">
                             <circle cx="12" cy="12" r="9" />
@@ -989,7 +989,7 @@ export default function TaskTable({ initialFilter, projectFilter, assignedToFilt
                             <div className="absolute z-50 top-full left-0 mt-1 w-48 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-canvas)] shadow-lg py-1 max-h-48 overflow-y-auto">
                               <button
                                 onClick={() => { setNewTaskProject(""); setProjectDropdownOpen(false); }}
-                                className={`w-full flex items-center gap-2 px-3 py-1.5 text-left text-[12px] hover:bg-[var(--bg-surface)] transition-colors ${!newTaskProject ? "bg-blue-50 text-blue-700" : "text-[var(--text-secondary)]"}`}
+                                className={`w-full flex items-center gap-2 px-3 py-1.5 text-left text-[12px] hover:bg-[var(--bg-surface)] transition-colors ${!newTaskProject ? "bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400" : "text-[var(--text-secondary)]"}`}
                               >
                                 No project
                               </button>
@@ -997,7 +997,7 @@ export default function TaskTable({ initialFilter, projectFilter, assignedToFilt
                                 <button
                                   key={p._id}
                                   onClick={() => { setNewTaskProject(p._id); setProjectDropdownOpen(false); }}
-                                  className={`w-full flex items-center gap-2 px-3 py-1.5 text-left text-[12px] hover:bg-[var(--bg-surface)] transition-colors ${newTaskProject === p._id ? "bg-blue-50 text-blue-700" : "text-[var(--text-secondary)]"}`}
+                                  className={`w-full flex items-center gap-2 px-3 py-1.5 text-left text-[12px] hover:bg-[var(--bg-surface)] transition-colors ${newTaskProject === p._id ? "bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400" : "text-[var(--text-secondary)]"}`}
                                 >
                                   <span className="truncate">{p.projectName}</span>
                                 </button>
@@ -1028,7 +1028,7 @@ export default function TaskTable({ initialFilter, projectFilter, assignedToFilt
                                 <div className="absolute z-50 top-full left-0 mt-1 w-48 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-canvas)] shadow-lg py-1 max-h-48 overflow-y-auto">
                                   <button
                                     onClick={() => { setNewTaskAssignee(""); setAssigneeDropdownOpen(false); }}
-                                    className={`w-full flex items-center gap-2 px-3 py-1.5 text-left text-[12px] hover:bg-[var(--bg-surface)] transition-colors ${!newTaskAssignee ? "bg-blue-50 text-blue-700" : "text-[var(--text-secondary)]"}`}
+                                    className={`w-full flex items-center gap-2 px-3 py-1.5 text-left text-[12px] hover:bg-[var(--bg-surface)] transition-colors ${!newTaskAssignee ? "bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400" : "text-[var(--text-secondary)]"}`}
                                   >
                                     Unassigned
                                   </button>
@@ -1036,7 +1036,7 @@ export default function TaskTable({ initialFilter, projectFilter, assignedToFilt
                                     <button
                                       key={u._id}
                                       onClick={() => { setNewTaskAssignee(u._id); setAssigneeDropdownOpen(false); }}
-                                      className={`w-full flex items-center gap-2 px-3 py-1.5 text-left text-[12px] hover:bg-[var(--bg-surface)] transition-colors ${newTaskAssignee === u._id ? "bg-blue-50 text-blue-700" : "text-[var(--text-secondary)]"}`}
+                                      className={`w-full flex items-center gap-2 px-3 py-1.5 text-left text-[12px] hover:bg-[var(--bg-surface)] transition-colors ${newTaskAssignee === u._id ? "bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400" : "text-[var(--text-secondary)]"}`}
                                     >
                                       <div className="w-5 h-5 rounded-full bg-gray-700 text-white flex items-center justify-center text-[8px] font-bold flex-shrink-0">
                                         {u.fullName?.charAt(0)}
@@ -1054,25 +1054,25 @@ export default function TaskTable({ initialFilter, projectFilter, assignedToFilt
 
                         {/* Status */}
                         <div className="relative" ref={statusDropdownRefInline}>
-                          <div className="inline-flex items-center rounded-full border border-gray-200 bg-[var(--bg-canvas)] overflow-hidden shadow-sm">
+                          <div className="inline-flex items-center rounded-full border border-[var(--border-subtle)] bg-[var(--bg-canvas)] overflow-hidden shadow-sm">
                             <button
                               onClick={() => { setStatusDropdownOpenInline(!statusDropdownOpenInline); setProjectDropdownOpen(false); setAssigneeDropdownOpen(false); }}
-                              className="flex items-center gap-1 px-2.5 py-1 text-[10px] font-bold tracking-wide uppercase hover:bg-gray-50 transition-colors"
+                              className="flex items-center gap-1 px-2.5 py-1 text-[10px] font-bold tracking-wide uppercase hover:bg-[var(--bg-surface)] transition-colors"
                               style={{ color: getInlineStatusColor(newTaskStatus) }}
                             >
                               {getInlineStatusLabel(newTaskStatus)}
                             </button>
                             <button
                               onClick={cycleNextStatus}
-                              className="flex items-center justify-center w-5 h-full border-l border-gray-200 hover:bg-gray-50 transition-colors"
+                              className="flex items-center justify-center w-5 h-full border-l border-[var(--border-subtle)] hover:bg-[var(--bg-surface)] transition-colors"
                             >
-                              <svg width="8" height="8" viewBox="0 0 24 24" fill="currentColor" className="text-gray-400">
+                              <svg width="8" height="8" viewBox="0 0 24 24" fill="currentColor" className="text-[var(--text-muted)]">
                                 <path d="M8 5v14l11-7z" />
                               </svg>
                             </button>
                             <button
                               onClick={() => setNewTaskStatus("completed")}
-                              className="flex items-center justify-center w-6 h-full border-l border-gray-200 hover:bg-green-50 transition-colors"
+                              className="flex items-center justify-center w-6 h-full border-l border-[var(--border-subtle)] hover:bg-green-50 dark:hover:bg-green-900/30 transition-colors"
                             >
                               <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke={newTaskStatus === "completed" ? "#00b884" : "#a0a0a0"} strokeWidth="3"><polyline points="20 6 9 17 4 12" /></svg>
                             </button>
@@ -1083,7 +1083,7 @@ export default function TaskTable({ initialFilter, projectFilter, assignedToFilt
                                 <button
                                   key={s}
                                   onClick={() => { setNewTaskStatus(s); setStatusDropdownOpenInline(false); }}
-                                  className={`w-full flex items-center gap-2 px-3 py-1.5 text-left text-[11px] font-bold tracking-wide uppercase hover:bg-[var(--bg-surface)] transition-colors ${newTaskStatus === s ? "bg-blue-50" : ""}`}
+                                  className={`w-full flex items-center gap-2 px-3 py-1.5 text-left text-[11px] font-bold tracking-wide uppercase hover:bg-[var(--bg-surface)] transition-colors ${newTaskStatus === s ? "bg-blue-50 dark:bg-blue-900/30" : ""}`}
                                   style={{ color: getInlineStatusColor(s) }}
                                 >
                                   <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: getInlineStatusColor(s) }} />
@@ -1130,7 +1130,7 @@ export default function TaskTable({ initialFilter, projectFilter, assignedToFilt
                       </div>
 
                       {/* Row 2: Subtasks */}
-                      <div className="ml-8 pl-4 border-l-2 border-dashed border-gray-200">
+                      <div className="ml-8 pl-4 border-l-2 border-dashed border-[var(--border-subtle)]">
                         <div className="flex items-center justify-between mb-2">
                           <span className="text-[11px] font-semibold text-[var(--text-muted)] uppercase tracking-wide">Subtasks</span>
                           <span className={`text-[10px] ${Math.abs(totalSubtaskHours - totalEstHours) > 0.01 && totalEstHours > 0 ? "text-red-500 font-bold" : "text-green-600"}`}>
@@ -1141,7 +1141,7 @@ export default function TaskTable({ initialFilter, projectFilter, assignedToFilt
                         {/* Subtask List */}
                         <div className="space-y-1 mb-2">
                           {subtasks.map((st, idx) => (
-                            <div key={idx} className="flex items-center gap-2 text-[12px] bg-white border border-[var(--border-subtle)] px-2 py-1 rounded-md">
+                            <div key={idx} className="flex items-center gap-2 text-[12px] bg-[var(--bg-canvas)] border border-[var(--border-subtle)] px-2 py-1 rounded-md">
                               <span className="flex-1 text-[var(--text-primary)]">{st.text}</span>
                               <span className="text-[var(--text-secondary)] font-mono">{toHHMM(st.hours, st.minutes)}</span>
                               <button onClick={() => removeSubtask(idx)} className="text-red-400 hover:text-red-600">
@@ -1158,7 +1158,7 @@ export default function TaskTable({ initialFilter, projectFilter, assignedToFilt
                             value={currentSubtaskText}
                             onChange={(e) => setCurrentSubtaskText(e.target.value)}
                             placeholder="Subtask description"
-                            className="flex-1 bg-white border border-[var(--border-subtle)] rounded-md px-2 py-1 text-[12px] outline-none"
+                            className="flex-1 bg-[var(--bg-canvas)] border border-[var(--border-subtle)] rounded-md px-2 py-1 text-[12px] text-[var(--text-primary)] outline-none"
                             onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addSubtask(); } }}
                           />
                           <div className="flex items-center gap-1">
@@ -1168,7 +1168,7 @@ export default function TaskTable({ initialFilter, projectFilter, assignedToFilt
                               onChange={(e) => setCurrentSubtaskHours(e.target.value)}
                               placeholder="Hr"
                               min="0"
-                              className="w-[35px] bg-white border border-[var(--border-subtle)] rounded-md px-1 py-1 text-[12px] outline-none text-center"
+                              className="w-[35px] bg-[var(--bg-canvas)] border border-[var(--border-subtle)] rounded-md px-1 py-1 text-[12px] text-[var(--text-primary)] outline-none text-center"
                               onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addSubtask(); } }}
                             />
                             <span className="text-[var(--text-muted)] text-[10px]">:</span>
@@ -1179,14 +1179,14 @@ export default function TaskTable({ initialFilter, projectFilter, assignedToFilt
                               placeholder="Min"
                               min="0"
                               max="59"
-                              className="w-[35px] bg-white border border-[var(--border-subtle)] rounded-md px-1 py-1 text-[12px] outline-none text-center"
+                              className="w-[35px] bg-[var(--bg-canvas)] border border-[var(--border-subtle)] rounded-md px-1 py-1 text-[12px] text-[var(--text-primary)] outline-none text-center"
                               onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addSubtask(); } }}
                             />
                           </div>
                           <button
                             onClick={addSubtask}
                             disabled={!currentSubtaskText.trim() || (parseInt(currentSubtaskHours || "0") === 0 && parseInt(currentSubtaskMinutes || "0") === 0)}
-                            className="px-2 py-1 bg-blue-50 text-blue-600 text-[11px] font-medium rounded-md hover:bg-blue-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                            className="px-2 py-1 bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 text-[11px] font-medium rounded-md hover:bg-blue-100 dark:hover:bg-blue-900/50 disabled:opacity-50 disabled:cursor-not-allowed"
                           >
                             Add
                           </button>
@@ -1199,7 +1199,7 @@ export default function TaskTable({ initialFilter, projectFilter, assignedToFilt
                           </div>
                         )}
                         {submissionError && (
-                          <div className="mt-2 text-[11px] text-red-600 font-medium bg-red-50 p-2 rounded border border-red-200">
+                          <div className="mt-2 text-[11px] text-red-600 dark:text-red-400 font-medium bg-red-50 dark:bg-red-900/30 p-2 rounded border border-red-200 dark:border-red-800">
                             Error: {submissionError}
                           </div>
                         )}
@@ -1406,7 +1406,7 @@ function TaskRow({ task, expandedTaskId, setExpandedTaskId, formatDueDate, isDue
     <>
       <div
         onClick={() => setExpandedTaskId(isExpanded ? null : task._id)}
-        className="grid grid-cols-[1fr_80px_140px_140px_120px_130px_40px] gap-2 items-center px-4 py-2.5 border-b border-[var(--border-subtle)] last:border-0 hover:bg-[var(--bg-surface)] group text-[14px] bg-[var(--bg-canvas)] transition-colors cursor-pointer"
+        className="grid grid-cols-[1fr_120px_140px_140px_120px_130px_40px] gap-2 items-center px-4 py-2.5 border-b border-[var(--border-subtle)] last:border-0 hover:bg-[var(--bg-surface)] group text-[14px] bg-[var(--bg-canvas)] transition-colors cursor-pointer"
       >
         {/* Name */}
         <div className="flex items-center gap-3 pl-4">
@@ -1443,8 +1443,8 @@ function TaskRow({ task, expandedTaskId, setExpandedTaskId, formatDueDate, isDue
               {task.assignedToName.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()}
             </div>
           ) : (
-            <div className="w-6 h-6 rounded-full border border-dashed border-gray-300 flex items-center justify-center" title="Unassigned">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-gray-300">
+            <div className="w-6 h-6 rounded-full border border-dashed border-[var(--border-subtle)] flex items-center justify-center" title="Unassigned">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-[var(--text-muted)]">
                 <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
                 <circle cx="12" cy="7" r="4" />
               </svg>
@@ -1563,7 +1563,7 @@ function TaskRow({ task, expandedTaskId, setExpandedTaskId, formatDueDate, isDue
                 ) : details.length === 0 ? (
                   <div className="text-sm text-[var(--text-tertiary)]">No subtasks available.</div>
                 ) : (
-                  <div className="pl-4 border-l-2 border-dashed border-gray-200 space-y-2">
+                  <div className="pl-4 border-l-2 border-dashed border-[var(--border-subtle)] space-y-2">
                     {details.map((d: TaskDetail, i: number) => {
                       const isEditing = editingDetailIndex === i;
 
@@ -1597,7 +1597,7 @@ function TaskRow({ task, expandedTaskId, setExpandedTaskId, formatDueDate, isDue
                         <div
                           key={`detail-${i}`}
                           onClick={(e) => { e.stopPropagation(); handleEditDetail(i, { ...d, time: d.time || "00:00" }); }}
-                          className="flex items-center gap-2 text-[13px] bg-white border border-[var(--border-subtle)] px-3 py-2 rounded-md hover:border-blue-300 cursor-pointer group/detail transition-all"
+                          className="flex items-center gap-2 text-[13px] bg-[var(--bg-canvas)] border border-[var(--border-subtle)] px-3 py-2 rounded-md hover:border-blue-300 dark:hover:border-blue-500 cursor-pointer group/detail transition-all"
                         >
                           <span className="flex-1 text-[var(--text-primary)]">{d.text}</span>
                           {d.time && <span className="text-[var(--text-secondary)] font-mono text-xs">{d.time}</span>}
