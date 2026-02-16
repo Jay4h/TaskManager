@@ -1,8 +1,7 @@
 "use client";
 
-import Link from "next/link";
-import { usePathname, useSearchParams } from "next/navigation";
-import { useEffect, useState, useRef } from "react";
+import { usePathname, useSearchParams, useRouter } from "next/navigation";
+import { useEffect, useState, useRef, memo } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import axios from "axios";
 import { authApi } from "../../src/api/auth.api";
@@ -34,6 +33,113 @@ type User = {
   role?: "admin" | "user";
 };
 
+// Task filters component - memoized to prevent re-renders of entire sidebar
+const TaskFilters = memo(function TaskFilters({ 
+  isCollapsed, 
+  pathname, 
+  myTasksOpen,
+  user,
+  onNavigate
+}: { 
+  isCollapsed: boolean; 
+  pathname: string;
+  myTasksOpen: boolean;
+  user: User | null;
+  onNavigate: (url: string) => void;
+}) {
+  const searchParams = useSearchParams();
+
+  if (!myTasksOpen || isCollapsed) return null;
+
+  return (
+    <div className="ml-3.5 py-0.5">
+      {[
+        {
+          key: "assigned", el: (
+            <SidebarItem
+              href="/dashboard/tasks?filter=assigned"
+              label="Assigned to me"
+              active={pathname === "/dashboard/tasks" && searchParams.get("filter") === "assigned"}
+              onNavigate={onNavigate}
+              icon={
+                <div className="w-4 h-4 rounded-full bg-gray-700 text-white flex items-center justify-center text-[9px] font-bold">
+                  {user?.firstName?.charAt(0) || "T"}
+                </div>
+              }
+            />
+          )
+        },
+        {
+          key: "all", el: (
+            <SidebarItem
+              href="/dashboard/tasks"
+              label="All Tasks"
+              active={pathname === "/dashboard/tasks" && !searchParams.get("filter")}
+              onNavigate={onNavigate}
+              icon={<ClipboardDocumentListIcon className="w-4 h-4" />}
+            />
+          )
+        },
+        {
+          key: "created", el: (
+            <SidebarItem
+              href="/dashboard/tasks?filter=created"
+              label="Personal List"
+              active={pathname === "/dashboard/tasks" && searchParams.get("filter") === "created"}
+              onNavigate={onNavigate}
+              icon={
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /><line x1="16" y1="13" x2="8" y2="13" /><line x1="16" y1="17" x2="8" y2="17" />
+                </svg>
+              }
+            />
+          )
+        },
+      ].map((item, idx, arr) => (
+        <div key={item.key} className="flex items-stretch">
+          <TreeConnector isLast={idx === arr.length - 1} />
+          <div className="flex-1 min-w-0">{item.el}</div>
+        </div>
+      ))}
+    </div>
+  );
+});
+
+// Memoized projects list component - prevents re-renders from parent when searchParams change
+const ProjectsList = memo(function ProjectsList({
+  projects,
+  pathname,
+  onNavigate
+}: {
+  projects: Array<{ _id: string; projectName: string; assignedUsers?: Array<{ _id: string; firstName: string; lastName: string }> }>;
+  pathname: string;
+  onNavigate: (url: string) => void;
+}) {
+  const searchParams = useSearchParams();
+
+  if (projects.length === 0) {
+    return (
+      <div className="flex items-stretch">
+        <TreeConnector isLast />
+        <div className="px-2 py-2 text-[11px] text-[var(--text-muted)]">No projects assigned</div>
+      </div>
+    );
+  }
+
+  return (
+    <>
+      {projects.map((project, idx) => (
+        <div key={project._id} className="flex items-stretch">
+          <TreeConnector isLast={idx === projects.length - 1} />
+          <div className="flex-1 min-w-0">
+            <ProjectSidebarItem project={project} pathname={pathname} searchParams={searchParams} onNavigate={onNavigate} />
+          </div>
+        </div>
+      ))}
+    </>
+  );
+});
+
 // Tree connector for sidebar tree-view lines (file-tree style: ├── └──)
 function TreeConnector({ isLast }: { isLast: boolean }) {
   const lineClass = "bg-gray-400/60 dark:bg-gray-500/60";
@@ -55,7 +161,7 @@ function TreeConnector({ isLast }: { isLast: boolean }) {
 
 export default function Sidebar({ userRole }: SidebarProps) {
   const pathname = usePathname();
-  const searchParams = useSearchParams();
+  const router = useRouter();
   const queryClient = useQueryClient();
   const [user, setUser] = useState<User | null>(null);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
@@ -78,6 +184,9 @@ export default function Sidebar({ userRole }: SidebarProps) {
 
   // Sidebar collapse state
   const [isCollapsed, setIsCollapsed] = useState(false);
+  
+  // Track if component is mounted on client
+  const [isMounted, setIsMounted] = useState(false);
 
   // Fetch projects for sidebar
   const isAdmin = userRole === "admin";
@@ -89,6 +198,11 @@ export default function Sidebar({ userRole }: SidebarProps) {
   });
 
   const projects = projectsData?.data || [];
+
+  // Set mounted flag for client-side only rendering
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
 
   useEffect(() => {
     const storedUser = localStorage.getItem("user");
@@ -149,16 +263,7 @@ export default function Sidebar({ userRole }: SidebarProps) {
     setIsDropdownOpen(false);
   };
 
-  const handleReloadProjects = async () => {
-    setIsReloading(true);
-    try {
-      await refetchProjects();
-    } catch (error) {
-      console.error("Failed to reload projects:", error);
-    } finally {
-      setIsReloading(false);
-    }
-  };
+  
 
   const closePasswordModal = () => {
     setIsPasswordModalOpen(false);
@@ -215,6 +320,12 @@ export default function Sidebar({ userRole }: SidebarProps) {
     } finally {
       setIsPasswordLoading(false);
     }
+  };
+
+  const navigateTo = (url: string) => {
+    // Direct navigation - avoids RSC calls but causes full page reload
+    // Since all pages are client components, this works fine
+    window.location.href = url;
   };
 
   const toggleTheme = () => {
@@ -284,6 +395,7 @@ export default function Sidebar({ userRole }: SidebarProps) {
                 label="Overview"
                 active={pathname === "/dashboard"}
                 collapsed={isCollapsed}
+                onNavigate={navigateTo}
               />
             </div>
 
@@ -301,6 +413,7 @@ export default function Sidebar({ userRole }: SidebarProps) {
                   label="Users"
                   active={pathname === "/dashboard/users"}
                   collapsed={isCollapsed}
+                  onNavigate={navigateTo}
                 />
               </div>
             )}
@@ -319,6 +432,7 @@ export default function Sidebar({ userRole }: SidebarProps) {
                   label="All Tasks"
                   active={pathname === "/dashboard/tasks"}
                   collapsed={isCollapsed}
+                  onNavigate={navigateTo}
                 />
               </div>
             )}
@@ -345,54 +459,14 @@ export default function Sidebar({ userRole }: SidebarProps) {
                   </div>
                 )}
 
-                {(!isCollapsed && myTasksOpen) && (
-                  <div className="ml-3.5 py-0.5">
-                    {[
-                      {
-                        key: "assigned", el: (
-                          <SidebarItem
-                            href="/dashboard/tasks?filter=assigned"
-                            label="Assigned to me"
-                            active={pathname === "/dashboard/tasks" && searchParams.get("filter") === "assigned"}
-                            icon={
-                              <div className="w-4 h-4 rounded-full bg-gray-700 text-white flex items-center justify-center text-[9px] font-bold">
-                                {user?.firstName?.charAt(0) || "T"}
-                              </div>
-                            }
-                          />
-                        )
-                      },
-                      {
-                        key: "all", el: (
-                          <SidebarItem
-                            href="/dashboard/tasks"
-                            label="All Tasks"
-                            active={pathname === "/dashboard/tasks" && !searchParams.get("filter")}
-                            icon={<ClipboardDocumentListIcon className="w-4 h-4" />}
-                          />
-                        )
-                      },
-                      {
-                        key: "created", el: (
-                          <SidebarItem
-                            href="/dashboard/tasks?filter=created"
-                            label="Personal List"
-                            active={pathname === "/dashboard/tasks" && searchParams.get("filter") === "created"}
-                            icon={
-                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /><line x1="16" y1="13" x2="8" y2="13" /><line x1="16" y1="17" x2="8" y2="17" />
-                              </svg>
-                            }
-                          />
-                        )
-                      },
-                    ].map((item, idx, arr) => (
-                      <div key={item.key} className="flex items-stretch">
-                        <TreeConnector isLast={idx === arr.length - 1} />
-                        <div className="flex-1 min-w-0">{item.el}</div>
-                      </div>
-                    ))}
-                  </div>
+                {isMounted && (!isCollapsed && myTasksOpen) && (
+                  <TaskFilters 
+                    isCollapsed={isCollapsed}
+                    pathname={pathname}
+                    myTasksOpen={myTasksOpen}
+                    user={user}
+                    onNavigate={navigateTo}
+                  />
                 )}
               </div>
             )}
@@ -410,35 +484,16 @@ export default function Sidebar({ userRole }: SidebarProps) {
                       <GitHubFolderIcon open={myProjectsOpen} />
                       <span className="font-medium text-[11px]"> My Projects</span>
                     </button>
-                    <div className="flex items-center gap-1">
+                      <div className="flex items-center gap-1">
                       <button
-                        onClick={handleReloadProjects}
-                        disabled={isReloading}
-                        className="flex items-center gap-1.5 px-2 py-0.5 rounded text-[var(--text-primary)] text-[11px] font-medium transition-colors disabled:opacity-50"
-                        title="Reload projects"
-                      >
-                        <svg
-                          className={`w-4 h-4 ${isReloading ? 'animate-spin' : ''}`}
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth="2"
-                        >
-                          <path d="M23 4v6h-6" />
-                          <path d="M1 20v-6h6" />
-                          <path d="M3.51 9a9 9 0 0114.85-3.36M20.49 15a9 9 0 01-14.85 3.36" />
-                        </svg>
-                      </button>
-                      <Link
-                        href="/dashboard/projects"
-                        prefetch={false}
-                        className="flex items-center gap-1.5 px-2 py-0.5 rounded bg-[var(--bg-surface-2)] hover:bg-[var(--bg-surface-3)] text-[var(--text-primary)] text-[11px] font-medium transition-colors border border-[var(--border-subtle)]"
+                        onClick={() => navigateTo('/dashboard/projects')}
+                        className="flex items-center gap-1.5 px-2 py-0.5 rounded bg-[var(--bg-surface-2)] hover:bg-[var(--bg-surface-3)] text-[var(--text-primary)] text-[11px] font-medium transition-colors border border-[var(--border-subtle)] cursor-pointer"
                       >
                         <svg aria-hidden="true" height="16" viewBox="0 0 16 16" width="16" className="octicon octicon-repo text-[var(--text-primary)] dark:text-white" fill="currentColor">
                           <path d="M2 2.5A2.5 2.5 0 0 1 4.5 0h8.75a.75.75 0 0 1 .75.75v12.5a.75.75 0 0 1-.75.75h-2.5a.75.75 0 0 1 0-1.5h1.75v-2h-8a1 1 0 0 0-.714 1.7.75.75 0 1 1-1.072 1.05A2.495 2.495 0 0 1 2 11.5Zm10.5-1h-8a1 1 0 0 0-1 1v6.708A2.486 2.486 0 0 1 4.5 9h8ZM5 12.25a.25.25 0 0 1 .25-.25h3.5a.25.25 0 0 1 .25.25v3.25a.25.25 0 0 1-.4.2l-1.45-1.087a.249.249 0 0 0-.3 0L5.4 15.7a.25.25 0 0 1-.4-.2Z" />
                         </svg>
                         New
-                      </Link>
+                      </button>
                     </div>
                   </div>
                 ) : (
@@ -447,38 +502,23 @@ export default function Sidebar({ userRole }: SidebarProps) {
                   </div>
                 )}
 
-                {(!isCollapsed && myProjectsOpen) && (
+                {isMounted && (!isCollapsed && myProjectsOpen) && (
                   <div className="ml-3.5 py-0.5">
-                    {projects.length === 0 ? (
-                      <div className="flex items-stretch">
-                        <TreeConnector isLast />
-                        <div className="px-2 py-2 text-[11px] text-[var(--text-muted)]">No projects assigned</div>
-                      </div>
-                    ) : (
-                      projects.map((project, idx) => (
-                        <div key={project._id} className="flex items-stretch">
-                          <TreeConnector isLast={idx === projects.length - 1} />
-                          <div className="flex-1 min-w-0">
-                            <ProjectSidebarItem project={project} pathname={pathname} searchParams={searchParams} />
-                          </div>
-                        </div>
-                      ))
-                    )}
+                    <ProjectsList projects={projects} pathname={pathname} onNavigate={navigateTo} />
                   </div>
                 )}
 
                 {/* Collapsed New Project Action */}
                 {isCollapsed && (
-                  <Link
-                    href="/dashboard/projects"
-                    prefetch={false}
-                    className="mt-2 flex items-center justify-center p-2 rounded bg-[var(--bg-surface-2)] hover:bg-[var(--bg-surface-3)] text-[var(--text-primary)] transition-colors border border-[var(--border-subtle)]"
+                  <button
+                    onClick={() => navigateTo('/dashboard/projects')}
+                    className="mt-2 flex items-center justify-center p-2 rounded bg-[var(--bg-surface-2)] hover:bg-[var(--bg-surface-3)] text-[var(--text-primary)] transition-colors border border-[var(--border-subtle)] cursor-pointer"
                     title="New Project"
                   >
                     <svg aria-hidden="true" height="16" viewBox="0 0 16 16" width="16" className="octicon octicon-repo text-[var(--text-primary)] dark:text-white" fill="currentColor">
                       <path d="M2 2.5A2.5 2.5 0 0 1 4.5 0h8.75a.75.75 0 0 1 .75.75v12.5a.75.75 0 0 1-.75.75h-2.5a.75.75 0 0 1 0-1.5h1.75v-2h-8a1 1 0 0 0-.714 1.7.75.75 0 1 1-1.072 1.05A2.495 2.495 0 0 1 2 11.5Zm10.5-1h-8a1 1 0 0 0-1 1v6.708A2.486 2.486 0 0 1 4.5 9h8ZM5 12.25a.25.25 0 0 1 .25-.25h3.5a.25.25 0 0 1 .25.25v3.25a.25.25 0 0 1-.4.2l-1.45-1.087a.249.249 0 0 0-.3 0L5.4 15.7a.25.25 0 0 1-.4-.2Z" />
                     </svg>
-                  </Link>
+                  </button>
                 )}
               </div>
             )}
@@ -630,7 +670,8 @@ function SidebarItem({
   rightIcon,
   active,
   href,
-  collapsed
+  collapsed,
+  onNavigate
 }: {
   icon?: React.ReactNode;
   label: string;
@@ -639,14 +680,22 @@ function SidebarItem({
   active?: boolean;
   href?: string;
   collapsed?: boolean;
+  onNavigate?: (url: string) => void;
 }) {
-  const content = (
+  const handleClick = () => {
+    if (href && onNavigate) {
+      onNavigate(href);
+    }
+  };
+
+  return (
     <div
       className={`flex items-center ${collapsed ? "justify-center px-0 py-2" : "justify-between px-2 py-1.5"} rounded transition-colors ${active
         ? "bg-[var(--bg-surface-3)] text-[var(--text-primary)] font-medium shadow-sm"
         : "text-[var(--text-secondary)] hover:bg-[var(--bg-surface-2)]"
-        }`}
+        } ${href ? "cursor-pointer" : ""}`}
       title={collapsed ? label : undefined}
+      onClick={handleClick}
     >
       <div className={`flex items-center gap-2 overflow-hidden ${collapsed ? "" : "flex-1"}`}>
         {icon && (
@@ -664,12 +713,6 @@ function SidebarItem({
       )}
     </div>
   );
-
-  if (href) {
-    return <Link href={href} prefetch={false} className="block w-full">{content}</Link>;
-  }
-
-  return content;
 }
 
 // GitHub-style folder icon
@@ -684,7 +727,7 @@ const GitHubFolderIcon = ({ open }: { open?: boolean }) => (
 );
 
 // Project sidebar item with expandable user dropdown
-function ProjectSidebarItem({ project, pathname, searchParams }: { project: { _id: string; projectName: string; assignedUsers?: Array<{ _id: string; firstName: string; lastName: string }> }; pathname: string; searchParams: URLSearchParams }) {
+function ProjectSidebarItem({ project, pathname, searchParams, onNavigate }: { project: { _id: string; projectName: string; assignedUsers?: Array<{ _id: string; firstName: string; lastName: string }> }; pathname: string; searchParams: URLSearchParams; onNavigate: (url: string) => void }) {
   const [expanded, setExpanded] = useState(false);
   const assignedUsers = project.assignedUsers || [];
   const isActive = pathname === "/dashboard/tasks" && searchParams.get("project") === project._id;
@@ -703,7 +746,7 @@ function ProjectSidebarItem({ project, pathname, searchParams }: { project: { _i
         </button>
 
         {/* Folder icon + name (navigates) */}
-        <Link href={`/dashboard/tasks?project=${project._id}`} prefetch={false} className="flex items-center gap-2 flex-1 min-w-0">
+        <div onClick={() => onNavigate(`/dashboard/tasks?project=${project._id}`)} className="flex items-center gap-2 flex-1 min-w-0 cursor-pointer">
           <span className={`flex-shrink-0 ${
             isActive ? "text-[var(--ck-blue)]" : "text-[var(--text-muted)]"
           }`}>
@@ -712,7 +755,7 @@ function ProjectSidebarItem({ project, pathname, searchParams }: { project: { _i
           <span className={`truncate text-[12px] font-medium ${
             isActive ? "text-[var(--text-primary)]" : ""
           }`}>{project.projectName}</span>
-        </Link>
+        </div>
 
         {/* User count badge */}
         {assignedUsers.length > 0 && (
@@ -730,37 +773,33 @@ function ProjectSidebarItem({ project, pathname, searchParams }: { project: { _i
               <div className="px-2 py-1 text-[11px] text-[var(--text-muted)] italic">No users assigned</div>
             </div>
           ) : (
-            assignedUsers.map((u, idx) => (
-              <div key={u._id} className="flex items-stretch">
-                <TreeConnector isLast={idx === assignedUsers.length - 1} />
-                <div className="flex-1 min-w-0">
-                  <Link
-                    href={`/dashboard/tasks?project=${project._id}&assignedTo=${u._id}`}
-                    prefetch={false}
-                    className={`flex items-center gap-2 px-2 py-1 rounded hover:bg-[var(--bg-surface-2)] transition-colors cursor-pointer group/user ${
-                      pathname === "/dashboard/tasks" && searchParams.get("project") === project._id && searchParams.get("assignedTo") === u._id
-                        ? "bg-[var(--bg-surface-2)]"
-                        : ""
-                    }`}
-                  >
-                    <div className={`w-5 h-5 rounded-full text-white flex items-center justify-center text-[9px] font-bold flex-shrink-0 group-hover/user:bg-blue-600 transition-colors ${
-                      pathname === "/dashboard/tasks" && searchParams.get("project") === project._id && searchParams.get("assignedTo") === u._id
-                        ? "bg-blue-600"
-                        : "bg-gray-700"
-                    }`}>
-                      {u.firstName?.charAt(0)}{u.lastName?.charAt(0)}
+            assignedUsers.map((u, idx) => {
+              const isUserActive = pathname === "/dashboard/tasks" && searchParams.get("project") === project._id && searchParams.get("assignedTo") === u._id;
+              return (
+                <div key={u._id} className="flex items-stretch">
+                  <TreeConnector isLast={idx === assignedUsers.length - 1} />
+                  <div className="flex-1 min-w-0">
+                    <div
+                      onClick={() => onNavigate(`/dashboard/tasks?project=${project._id}&assignedTo=${u._id}`)}
+                      className={`flex items-center gap-2 px-2 py-1 rounded hover:bg-[var(--bg-surface-2)] transition-colors cursor-pointer group/user ${
+                        isUserActive ? "bg-[var(--bg-surface-2)]" : ""
+                      }`}
+                    >
+                      <div className={`w-5 h-5 rounded-full text-white flex items-center justify-center text-[9px] font-bold flex-shrink-0 group-hover/user:bg-blue-600 transition-colors ${
+                        isUserActive ? "bg-blue-600" : "bg-gray-700"
+                      }`}>
+                        {u.firstName?.charAt(0)}{u.lastName?.charAt(0)}
+                      </div>
+                      <span className={`text-[11px] truncate group-hover/user:text-[var(--text-primary)] transition-colors ${
+                        isUserActive ? "text-[var(--text-primary)] font-medium" : "text-[var(--text-secondary)]"
+                      }`}>
+                        {u.firstName} {u.lastName}
+                      </span>
                     </div>
-                    <span className={`text-[11px] truncate group-hover/user:text-[var(--text-primary)] transition-colors ${
-                      pathname === "/dashboard/tasks" && searchParams.get("project") === project._id && searchParams.get("assignedTo") === u._id
-                        ? "text-[var(--text-primary)] font-medium"
-                        : "text-[var(--text-secondary)]"
-                    }`}>
-                      {u.firstName} {u.lastName}
-                    </span>
-                  </Link>
+                  </div>
                 </div>
-              </div>
-            ))
+              );
+            })
           )}
         </div>
       )}

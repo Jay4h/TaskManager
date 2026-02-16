@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import { dashboardApi } from "../../src/api/dashboard.api";
@@ -18,25 +18,24 @@ const PROJECT_COLORS = [
 ];
 
 export default function DashboardPage() {
-  const [user, setUser] = useState<{
-    firstName: string;
-    lastName: string;
-    email: string;
-    role?: string;
-  } | null>(null);
+  const [isAdmin, setIsAdmin] = useState(false);
+  const hasInitialized = useRef(false);
 
+  // Initialize admin status only once
   useEffect(() => {
+    if (hasInitialized.current) return;
+    hasInitialized.current = true;
+
     const stored = localStorage.getItem("user");
     if (stored) {
       try {
-        setUser(JSON.parse(stored));
+        const userData = JSON.parse(stored);
+        setIsAdmin(userData.role === "admin");
       } catch {
-        /* ignore */
+        setIsAdmin(false);
       }
     }
   }, []);
-
-  const isAdmin = user?.role === "admin";
 
   const { data: stats } = useQuery({
     queryKey: ["dashboard-stats"],

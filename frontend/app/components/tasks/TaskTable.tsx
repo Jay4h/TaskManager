@@ -89,7 +89,7 @@ export default function TaskTable({ initialFilter, projectFilter, assignedToFilt
 
   // Fetch tasks
   const { data, isLoading, isError } = useQuery({
-    queryKey: ["tasks", currentPage, itemsPerPage, apiFilter, projectFilter, assignedToFilter],
+    queryKey: ["tasks", currentPage, itemsPerPage, apiFilter],
     queryFn: () => tasksApi.getTasks(currentPage, itemsPerPage, apiFilter),
     staleTime: 5 * 60 * 1000,
   });

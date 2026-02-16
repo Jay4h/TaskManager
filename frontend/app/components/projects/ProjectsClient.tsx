@@ -22,14 +22,23 @@ export default function ProjectsClient({ userRole }: { userRole?: "admin" | "use
 
   const isAdmin = userRole === "admin";
 
-  useEffect(() => {
+  // Get user ID from localStorage
+  const getUserIdFromStorage = () => {
     const userStr = localStorage.getItem("user");
     if (userStr) {
       try {
         const user = JSON.parse(userStr);
-        setCurrentUserId(user.userId || user.id || user._id);
-      } catch { /* ignore */ }
+        return user.userId;
+      } catch {
+        return null;
+      }
     }
+    return null;
+  };
+
+  useEffect(() => {
+    const userId = getUserIdFromStorage();
+    setCurrentUserId(userId);
   }, []);
 
   const { data: projectsData, isLoading: projectsLoading } = useQuery({
@@ -78,19 +87,8 @@ export default function ProjectsClient({ userRole }: { userRole?: "admin" | "use
 
   // Check if admin is trying to assign the project to themselves
   if (isAdmin) {
-    // Get current user ID fresh from localStorage if not in state
-    const userId = currentUserId || (() => {
-      const userStr = localStorage.getItem("user");
-      if (userStr) {
-        try {
-          const user = JSON.parse(userStr);
-          return user.userId || user.id || user._id;
-        } catch {
-          return null;
-        }
-      }
-      return null;
-    })();
+    // Get current user ID from storage
+    const userId = currentUserId || getUserIdFromStorage();
 
     if (!userId) {
       setProjectError("Unable to verify current user. Please refresh the page.");
@@ -112,18 +110,7 @@ export default function ProjectsClient({ userRole }: { userRole?: "admin" | "use
 
  const toggleUser = (userId: string) => {
   // Get current user ID
-  const myUserId = currentUserId || (() => {
-    const userStr = localStorage.getItem("user");
-    if (userStr) {
-      try {
-        const user = JSON.parse(userStr);
-        return user.userId || user.id || user._id;
-      } catch {
-        return null;
-      }
-    }
-    return null;
-  })();
+  const myUserId = currentUserId || getUserIdFromStorage();
 
   // Prevent admin from selecting themselves
   if (isAdmin && userId === myUserId) {

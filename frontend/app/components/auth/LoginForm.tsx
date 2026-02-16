@@ -186,6 +186,7 @@ export default function LoginForm() {
             localStorage.setItem("token", result.data.token);
 
             const userData = {
+                userId: result.data.userId,
                 firstName: result.data.firstName,
                 lastName: result.data.lastName,
                 email: result.data.email,

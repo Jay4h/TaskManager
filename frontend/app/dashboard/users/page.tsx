@@ -1,38 +1,44 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import UsersClient from "../../components/users/UsersClient";
 
 export default function UsersPage() {
   const router = useRouter();
-  const [isAdmin, setIsAdmin] = useState(false);
-  const [loading, setLoading] = useState(true);
+  const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
+  const hasCheckedAuth = useRef(false);
 
   useEffect(() => {
+    // Only run once
+    if (hasCheckedAuth.current) return;
+    hasCheckedAuth.current = true;
+
     const user = localStorage.getItem("user");
-    if (user) {
-      try {
-        const userData = JSON.parse(user);
-        if (userData.role === "admin") {
-          setIsAdmin(true);
-        } else {
-          router.push("/dashboard");  
-        }
-      } catch (error) {
-        console.error("Error parsing user data:", error);
+    if (!user) {
+      router.push("/");
+      return;
+    }
+
+    try {
+      const userData = JSON.parse(user);
+      if (userData.role === "admin") {
+        setIsAdmin(true);
+      } else {
         router.push("/dashboard");
       }
-    } else {
-      router.push("/");
+    } catch (error) {
+      console.error("Error parsing user data:", error);
+      router.push("/dashboard");
     }
-    setLoading(false);
   }, [router]);
 
-  if (loading) {
-    return <div className="text-center py-8">Loading...</div>;
+  // Show nothing while checking auth
+  if (isAdmin === null) {
+    return null;
   }
 
+  // Only render if admin
   if (!isAdmin) {
     return null;
   }

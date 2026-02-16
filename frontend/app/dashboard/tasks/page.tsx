@@ -1,7 +1,16 @@
 "use client";
 
+import { Suspense } from "react";
 import TasksClient from "../../components/tasks/TasksClient";
 
-export default function TasksPage() {
+function TasksContent() {
   return <TasksClient />;
+}
+
+export default function TasksPage() {
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <TasksContent />
+    </Suspense>
+  );
 }

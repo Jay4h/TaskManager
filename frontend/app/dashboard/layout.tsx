@@ -1,7 +1,7 @@
 "use client";
 
 import Sidebar from "../components/Sidebar";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 
 export default function DashboardLayout({
   children,
@@ -9,10 +9,12 @@ export default function DashboardLayout({
   children: React.ReactNode;
 }) {
   const [userRole, setUserRole] = useState<"admin" | "user" | undefined>();
-  const [mounted, setMounted] = useState(false);
+  const hasInitialized = useRef(false);
 
   useEffect(() => {
-    setMounted(true);
+    if (hasInitialized.current) return;
+    hasInitialized.current = true;
+
     const user = localStorage.getItem("user");
     if (user) {
       try {
@@ -26,12 +28,10 @@ export default function DashboardLayout({
       } catch (error) {
         console.error("Error parsing user data:", error);
       }
+    } else {
+      setUserRole("user");
     }
   }, []);
-
-  if (!mounted) {
-    return null;
-  }
 
   return (
     <div className="flex h-screen w-full bg-[var(--bg-canvas)] text-[13px] font-sans text-[var(--text-primary)] overflow-hidden">

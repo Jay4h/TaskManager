@@ -1,10 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useEffect, useState, useMemo } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { useSearchParams } from "next/navigation";
 import TaskTable from "./TaskTable";
-import { projectsApi } from "../../../src/api/projects.api";
 
 export default function TasksClient() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
@@ -13,57 +12,35 @@ export default function TasksClient() {
   const queryClient = useQueryClient();
   const searchParams = useSearchParams();
 
-  const filterParam = searchParams.get("filter") || "";
-  const projectParam = searchParams.get("project") || "";
+  const filterParam = useMemo(() => searchParams.get("filter") || "", [searchParams]);
+  const projectParam = useMemo(() => searchParams.get("project") || "", [searchParams]);
+  const assignedToParam = useMemo(() => searchParams.get("assignedTo") || "", [searchParams]);
 
+  // Single effect to initialize auth state
   useEffect(() => {
     const userStr = localStorage.getItem("user");
+    let isAdminUser = false;
+    
     if (userStr) {
       try {
         const user = JSON.parse(userStr);
-        setIsAdmin(user.role === "admin");
+        isAdminUser = user.role === "admin";
       } catch {
-        setIsAdmin(false);
+        isAdminUser = false;
       }
-    } else {
-      setIsAdmin(false);
     }
-  }, []);
-
-  const { data: projectsData } = useQuery({
-    queryKey: ["projects", isAdmin ? "admin" : "user"],
-    queryFn: isAdmin ? projectsApi.getAllProjects : projectsApi.getMyProjects,
-    enabled: projectParam !== "" && isAdmin !== null,
-    staleTime: 5 * 60 * 1000,
-  });
-
-  const projects = projectsData?.data || [];
-  const projectName = projects.find((p: { _id: string; projectName: string }) => p._id === projectParam)?.projectName;
-
-  // Determine breadcrumb text
-  const getBreadcrumbLabel = () => {
-    if (filterParam === "assigned") return "Assigned to me";
-    if (filterParam === "created") return "Personal List";
-    if (projectParam) return projectName || "Project Tasks";
-    return "All Tasks";
-  };
-
-  const checkAuth = () => {
-    const token = localStorage.getItem("token");
-    return !!token;
-  };
-
-  useEffect(() => {
-    setIsLoggedIn(checkAuth());
+    
+    setIsAdmin(isAdminUser);
+    setIsLoggedIn(!!localStorage.getItem("token"));
     setIsLoading(false);
   }, []);
 
+  // Handle auth state changes
   useEffect(() => {
     const handleAuthChange = (e: Event) => {
       const customEvent = e as CustomEvent<{ isLoggedIn: boolean }>;
       const hasToken = customEvent.detail.isLoggedIn;
       setIsLoggedIn(hasToken);
-
       if (!hasToken) {
         queryClient.clear();
       }
@@ -72,6 +49,13 @@ export default function TasksClient() {
     window.addEventListener("authStateChanged", handleAuthChange);
     return () => window.removeEventListener("authStateChanged", handleAuthChange);
   }, [queryClient]);
+
+  const getBreadcrumbLabel = () => {
+    if (filterParam === "assigned") return "Assigned to me";
+    if (filterParam === "created") return "Personal List";
+    if (projectParam) return "Project Tasks";
+    return "All Tasks";
+  };
 
   if (isLoading) {
     return (
@@ -160,7 +144,7 @@ export default function TasksClient() {
         <TaskTable 
           initialFilter={filterParam} 
           projectFilter={projectParam} 
-          assignedToFilter={searchParams.get("assignedTo") || undefined}
+          assignedToFilter={assignedToParam || undefined}
           readOnly={!filterParam && !projectParam}
         />
       </div>
