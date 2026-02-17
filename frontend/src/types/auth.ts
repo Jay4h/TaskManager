@@ -14,6 +14,7 @@ export interface AuthResponse {
     firstName: string;
     lastName: string;
     role: "admin" | "user";
+    emailVerified: boolean;
   };
   message: string;
 }

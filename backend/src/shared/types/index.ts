@@ -15,6 +15,7 @@ export interface AuthResponse {
     firstName: string;
     lastName: string;
     role: "admin" | "user";
+    emailVerified: boolean;
   };
   message: string;
 }
@@ -104,6 +105,7 @@ export interface User {
   lastName: string;
   email: string;
   role: "admin" | "user";
+  emailVerified: boolean;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -116,6 +118,7 @@ export interface CreateUserResponse {
     firstName: string;
     lastName: string;
     role: "admin" | "user";
+    emailVerified: boolean;
   };
   message: string;
 }

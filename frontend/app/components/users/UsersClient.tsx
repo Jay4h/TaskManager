@@ -191,8 +191,18 @@ export default function UsersClient() {
                 >
                   {/* Name */}
                   <div className="flex items-center gap-3 pl-4">
-                    <div className="w-7 h-7 rounded-full bg-gray-700 text-white flex items-center justify-center text-[10px] font-bold flex-shrink-0">
-                      {user.firstName?.charAt(0)}{user.lastName?.charAt(0)}
+                    <div className="flex items-center gap-2">
+                      <div className="w-7 h-7 rounded-full bg-gray-700 text-white flex items-center justify-center text-[10px] font-bold flex-shrink-0">
+                        {user.firstName?.charAt(0)}{user.lastName?.charAt(0)}
+                      </div>
+                      {user.emailVerified ? (
+                        <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-700 bg-emerald-100 px-1.5 py-0.5 rounded-full">
+                          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
+                            <polyline points="20 6 9 17 4 12" />
+                          </svg>
+                          Verified
+                        </span>
+                      ) : null}
                     </div>
                     <span className="truncate font-medium text-[var(--text-primary)]">{user.firstName} {user.lastName}</span>
                   </div>

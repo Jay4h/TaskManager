@@ -145,4 +145,57 @@ export class EmailService {
       html,
     });
   }
+
+  async sendEmailVerificationEmail(params: {
+    to: string;
+    recipientName: string;
+    verifyUrl: string;
+  }): Promise<void> {
+    if (!this.transporter) {
+      return;
+    }
+
+    const escapeHtml = (value: string): string =>
+      value
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#39;");
+
+    const safeName = escapeHtml(params.recipientName || "there");
+    const safeUrl = escapeHtml(params.verifyUrl);
+
+    const text = [
+      `Hello ${params.recipientName || "there"},`,
+      "",
+      "Please verify your email address to activate your account.",
+      `Verify: ${params.verifyUrl}`,
+      "",
+      "If you did not request this, you can ignore this email.",
+    ].join("\n");
+
+    const html = `
+      <div style="background:#f7f7f9; padding:24px; font-family:Arial, sans-serif;">
+        <div style="max-width:600px; margin:0 auto; background:#ffffff; border-radius:10px; padding:24px; border:1px solid #e5e7eb;">
+          <div style="font-size:18px; font-weight:700; color:#111827; margin-bottom:12px;">Verify your email</div>
+          <div style="font-size:14px; color:#374151; margin-bottom:16px;">Hello ${safeName},</div>
+          <div style="font-size:14px; color:#111827; margin-bottom:16px;">Please verify your email address to activate your account.</div>
+          <a href="${safeUrl}" style="display:inline-block; background:#2563eb; color:#ffffff; text-decoration:none; padding:10px 16px; border-radius:6px; font-size:14px; font-weight:600;">Verify Email</a>
+          <div style="margin-top:16px; font-size:12px; color:#6b7280;">
+            Or copy and paste this link into your browser:<br />
+            <span style="word-break:break-all;">${safeUrl}</span>
+          </div>
+        </div>
+      </div>
+    `;
+
+    await this.transporter.sendMail({
+      to: params.to,
+      from: ENV.SMTP_FROM,
+      subject: "Verify your email",
+      text,
+      html,
+    });
+  }
 }

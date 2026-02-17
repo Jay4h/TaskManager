@@ -9,6 +9,7 @@ type User = {
     lastName: string;
     email: string;
     role?: "admin" | "user";
+    emailVerified?: boolean;
 };
 
 export default function LoginForm() {
@@ -191,6 +192,7 @@ export default function LoginForm() {
                 lastName: result.data.lastName,
                 email: result.data.email,
                 role: result.data.role,
+                emailVerified: result.data.emailVerified,
             };
 
             localStorage.setItem("user", JSON.stringify(userData));

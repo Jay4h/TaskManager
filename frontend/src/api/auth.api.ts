@@ -7,6 +7,13 @@ export const authApi = {
     return response.data;
   },
 
+  verifyEmail: async (token: string) => {
+    const response = await api.get<{ success: boolean; message: string }>("/auth/verify-email", {
+      params: { token },
+    });
+    return response.data;
+  },
+
   changePassword: async (currentPassword: string, newPassword: string, confirmPassword: string) => {
     const response = await api.post<{ success: boolean; message: string }>("/auth/change-password", {
       currentPassword,

@@ -154,8 +154,9 @@ export class TasksService {
 
     const assignedUserEmail = typeof assignedUser.email === "string" ? assignedUser.email : null;
     const assignedUserName = [assignedUser.firstName, assignedUser.lastName].filter(Boolean).join(" ") || "there";
+    const assignedUserVerified = assignedUser.emailVerified === true;
 
-    if (assignedUserEmail) {
+    if (assignedUserEmail && assignedUserVerified) {
       try {
         await this.emailService.sendTaskAssignedEmail({
           to: assignedUserEmail,
@@ -170,6 +171,8 @@ export class TasksService {
       } catch (error) {
         console.error("Failed to send task assignment email:", error);
       }
+    } else if (assignedUserEmail && !assignedUserVerified) {
+      console.warn("Skipping task assignment email for unverified user:", assignedUserEmail);
     }
 
     return {

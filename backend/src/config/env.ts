@@ -8,6 +8,7 @@ export const ENV = {
   MONGODB_URI: process.env.MONGODB_URI,
   DB_NAME: process.env.DB_NAME || "mydb",
   JWT_SECRET: process.env.JWT_SECRET || "awXwNFpMPDdMCjk4eYEi5OdjGHSf7TS/2jMtH3EgfN0=",
+  FRONTEND_URL: process.env.FRONTEND_URL,
   EMAIL_NOTIFICATIONS_ENABLED: (process.env.EMAIL_NOTIFICATIONS_ENABLED || "false").toLowerCase() === "true",
   SMTP_HOST: process.env.SMTP_HOST,
   SMTP_PORT: process.env.SMTP_PORT ? parseInt(process.env.SMTP_PORT, 10) : undefined,

@@ -1,6 +1,6 @@
 import bcrypt from "bcrypt";
 import mongoose from "mongoose";
-import { generateToken } from "../infrastructure/database/jwt.js";
+import { generateToken, verifyEmailVerificationToken } from "../infrastructure/database/jwt.js";
 import { UserModel } from "../models/user.model.js";
 import type { AuthResponse } from "../shared/types/index.js";
 
@@ -61,8 +61,33 @@ export class AuthService {
         firstName: user.firstName,
         lastName: user.lastName,
         role: userRole,
+        emailVerified: user.emailVerified === true,
       },
     };
+  }
+
+  async verifyEmail(token: string): Promise<{ success: boolean; message: string }> {
+    if (!token || typeof token !== "string") {
+      throw new Error("Verification token is required");
+    }
+
+    const payload = await verifyEmailVerificationToken(token);
+    if (!payload) {
+      throw new Error("Invalid or expired verification token");
+    }
+
+    const user = await this.userModel.findById(payload.userId);
+    if (!user) {
+      throw new Error("User not found");
+    }
+
+    if (user.emailVerified) {
+      return { success: true, message: "Email already verified" };
+    }
+
+    await this.userModel.markEmailVerified(payload.userId);
+
+    return { success: true, message: "Email verified successfully" };
   }
 
   async changePassword(userId: string, currentPassword: string, newPassword: string): Promise<{ success: boolean; message: string }> {

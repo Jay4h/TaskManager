@@ -1,14 +1,19 @@
 import bcrypt from "bcrypt";
 import mongoose from "mongoose";
 import { UserModel } from "../models/user.model.js";
+import { EmailService } from "./email.service.js";
+import { ENV } from "../config/env.js";
+import { generateEmailVerificationToken } from "../infrastructure/database/jwt.js";
 import type { CreateUserRequest, CreateUserResponse } from "../shared/types/index.js";
 import { ForbiddenError, BadRequestError, NotFoundError, InternalServerError } from "../shared/types/index.js";
 
 export class UsersService {
     private userModel: UserModel;
+    private emailService: EmailService;
 
     constructor() {
         this.userModel = new UserModel();
+        this.emailService = new EmailService();
     }
 
     /**
@@ -117,6 +122,21 @@ export class UsersService {
 
         const result = await this.userModel.create(userData);
 
+        const verifyBase = ENV.FRONTEND_URL || "http://localhost:3000";
+        const recipientName = `${result.user.firstName} ${result.user.lastName}`.trim();
+
+        try {
+            const token = await generateEmailVerificationToken(result.insertedId, result.user.email);
+            const verifyUrl = `${verifyBase.replace(/\/$/, "")}/verify-email?token=${encodeURIComponent(token)}`;
+            await this.emailService.sendEmailVerificationEmail({
+                to: result.user.email,
+                recipientName: recipientName || "there",
+                verifyUrl,
+            });
+        } catch (error) {
+            console.error("Failed to send verification email:", error);
+        }
+
         return {
             success: true,
             data: {
@@ -125,6 +145,7 @@ export class UsersService {
                 firstName: result.user.firstName,
                 lastName: result.user.lastName,
                 role: requestedRole,
+                emailVerified: result.user.emailVerified === true,
             },
             message: "User created successfully",
         };
@@ -175,6 +196,7 @@ export class UsersService {
                 lastName: user.lastName,
                 email: user.email,
                 role: roleName,
+                emailVerified: user.emailVerified === true,
                 createdAt: user.createdAt,
                 updatedAt: user.updatedAt,
             };

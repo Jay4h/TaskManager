@@ -74,4 +74,25 @@ export class AuthController {
       }
     }
   }
+
+  async verifyEmail(req: Request, res: Response): Promise<void> {
+    try {
+      const token = req.query.token;
+      if (!token || typeof token !== "string") {
+        res.status(400).json({ error: "Verification token is required" });
+        return;
+      }
+
+      const result = await this.authService.verifyEmail(token);
+      res.status(200).json(result);
+    } catch (error) {
+      console.error("Auth verifyEmail error:", error);
+      if (error instanceof Error) {
+        const message = error.message || "Verification failed";
+        res.status(400).json({ error: message });
+      } else {
+        res.status(500).json({ error: "Server error" });
+      }
+    }
+  }
 }
