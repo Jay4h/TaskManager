@@ -192,14 +192,15 @@ export default function UsersClient() {
                   {/* Name */}
                   <div className="flex items-center gap-3 pl-4">
                     <div className="flex items-center gap-2">
-                      <div className="w-7 h-7 rounded-full bg-gray-700 text-white flex items-center justify-center text-[10px] font-bold flex-shrink-0">
-                        {user.firstName?.charAt(0)}{user.lastName?.charAt(0)}
+                    </div>
+                    <div className="w-7 h-7 rounded-full bg-gray-700 text-white flex items-center justify-center text-[10px] font-bold flex-shrink-0">
+                        {user.firstName?.charAt(0)}{user.lastName?.charAt(0)} 
                       </div>
-                      {user.emailVerified ? (
+                    <span className="truncate font-medium text-[var(--text-primary)]">{user.firstName} {user.lastName}</span>
+                    {user.emailVerified ? (
                         <img src="/verified-badge.svg" alt="Verified" className="w-4 h-4" title="Email Verified" />
                       ) : null}
-                    </div>
-                    <span className="truncate font-medium text-[var(--text-primary)]">{user.firstName} {user.lastName}</span>
+                    
                   </div>
 
                   {/* Email */}
