@@ -1,6 +1,9 @@
 import { SignJWT, jwtVerify } from "jose";
+import dotenv from "dotenv";
+dotenv.config();
 
-const JWT_SECRET = process.env.JWT_SECRET || "awXwNFpMPDdMCjk4eYEi5OdjGHSf7TS/2jMtH3EgfN0=";
+const JWT_SECRET = process.env.JWT_SECRET || "";
+
 const secret = new TextEncoder().encode(JWT_SECRET);
 
 export type JWTPayload = {

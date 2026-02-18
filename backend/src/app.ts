@@ -8,9 +8,9 @@ import usersRoutes from "./routes/users.routes.js";
 import dashboardRoutes from "./routes/dashboard.routes.js";
 import connectDB from "./infrastructure/database/mongodb.js";
 
+
 export function createApp() {
   const app = express();
-  
   // Middleware - CORS and body parser must come first
   app.use(cors(CORS_CONFIG));
   app.use(express.json());
