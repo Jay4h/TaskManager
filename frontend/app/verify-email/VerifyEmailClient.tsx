@@ -60,7 +60,7 @@ export default function VerifyEmailClient() {
             {status === "success" && (
               <div className="mx-auto h-20 w-20 flex items-center justify-center">
                 <img 
-                  src="/verified-badge.png" 
+                  src="/verified-badge.svg" 
                   alt="Email verified" 
                   className="w-full h-full object-contain"
                 />
