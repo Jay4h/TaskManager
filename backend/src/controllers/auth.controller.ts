@@ -15,8 +15,8 @@ export class AuthController {
       res.status(200).json(result);
     } catch (error) {
       console.error("Auth login error:", error);
-      if (error instanceof Error && (error.message.includes("not found") || error.message.includes("Invalid password"))) {
-        res.status(401).json({ error: error.message });
+      if (error instanceof Error && error.message === "Invalid credentials") {
+        res.status(401).json({ error: "Invalid credentials" });
       } else {
         res.status(500).json({ error: "Server error" });
       }
@@ -49,9 +49,14 @@ export class AuthController {
         return;
       }
 
-      // Validate password length
-      if (body.newPassword.length < 6) {
-        res.status(400).json({ error: "New password must be at least 6 characters" });
+      // Validate password strength
+      const hasLength = body.newPassword.length >= 8;
+      const hasUppercase = /[A-Z]/.test(body.newPassword);
+      const hasLowercase = /[a-z]/.test(body.newPassword);
+      const hasDigit = /\d/.test(body.newPassword);
+      const hasSpecial = /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(body.newPassword);
+      if (!hasLength || !hasUppercase || !hasLowercase || !hasDigit || !hasSpecial) {
+        res.status(400).json({ error: "New password must be at least 8 characters and include uppercase, lowercase, number, and special character" });
         return;
       }
 

@@ -7,7 +7,7 @@ export const ENV = {
   PORT: parseInt(process.env.PORT || "3001", 10),
   MONGODB_URI: process.env.MONGODB_URI,
   DB_NAME: process.env.DB_NAME || "mydb",
-  JWT_SECRET: process.env.JWT_SECRET || "awXwNFpMPDdMCjk4eYEi5OdjGHSf7TS/2jMtH3EgfN0=",
+  JWT_SECRET: process.env.JWT_SECRET,
   FRONTEND_URL: process.env.FRONTEND_URL,
   EMAIL_NOTIFICATIONS_ENABLED: (process.env.EMAIL_NOTIFICATIONS_ENABLED || "false").toLowerCase() === "true",
   SMTP_HOST: process.env.SMTP_HOST,
@@ -21,4 +21,8 @@ export const ENV = {
 // Validate required env vars
 if (!ENV.MONGODB_URI) {
   throw new Error("Missing MONGODB_URI in environment variables");
+}
+
+if (!ENV.JWT_SECRET) {
+  throw new Error("Missing JWT_SECRET in environment variables");
 }

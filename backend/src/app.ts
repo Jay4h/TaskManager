@@ -1,5 +1,7 @@
 import express from "express";
 import cors from "cors";
+import helmet from "helmet";
+import rateLimit from "express-rate-limit";
 import { CORS_CONFIG } from "./middlewares/cors.js";
 import authRoutes from "./routes/auth.routes.js";
 import tasksRoutes from "./routes/tasks.routes.js";
@@ -8,9 +10,18 @@ import usersRoutes from "./routes/users.routes.js";
 import dashboardRoutes from "./routes/dashboard.routes.js";
 import connectDB from "./infrastructure/database/mongodb.js";
 
+const authRateLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Too many requests, please try again later." },
+});
 
 export function createApp() {
   const app = express();
+  // Security headers
+  app.use(helmet());
   // Middleware - CORS and body parser must come first
   app.use(cors(CORS_CONFIG));
   app.use(express.json());
@@ -27,7 +38,7 @@ export function createApp() {
   });
   
   // Routes
-  app.use("/api/auth", authRoutes);
+  app.use("/api/auth", authRateLimiter, authRoutes);
   app.use("/api/tasks", tasksRoutes);
   app.use("/api/projects", projectsRoutes);
   app.use("/api/users", usersRoutes);
