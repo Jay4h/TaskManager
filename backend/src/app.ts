@@ -8,6 +8,7 @@ import tasksRoutes from "./routes/tasks.routes.js";
 import projectsRoutes from "./routes/projects.routes.js";
 import usersRoutes from "./routes/users.routes.js";
 import dashboardRoutes from "./routes/dashboard.routes.js";
+import channelsRoutes from "./routes/channels.routes.js";
 import connectDB from "./infrastructure/database/mongodb.js";
 
 const AUTH_RATE_LIMIT_WINDOW_MS = 15 * 60 * 1000; // 15 minutes
@@ -46,6 +47,7 @@ export function createApp() {
   app.use("/api/projects", projectsRoutes);
   app.use("/api/users", usersRoutes);
   app.use("/api/dashboard", dashboardRoutes);
+  app.use("/api/channels", channelsRoutes);
   // Error handling middleware
   app.use((err: Error, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
     console.error("Unhandled error:", err);
