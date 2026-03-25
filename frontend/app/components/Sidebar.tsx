@@ -1,10 +1,11 @@
 "use client";
 
 import { usePathname, useSearchParams, useRouter } from "next/navigation";
-import { useEffect, useState, useRef, memo, Suspense } from "react";
+import { useEffect, useState, useRef, memo, Suspense, useMemo } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import axios from "axios";
 import { authApi } from "../../src/api/auth.api";
+import { channelsApi } from "../../src/api/channels.api";
 import { projectsApi } from "../../src/api/projects.api";
 import {
   HomeIcon,
@@ -20,14 +21,29 @@ import {
   ChartBarIcon,
   SquaresPlusIcon,
   EllipsisHorizontalIcon,
+  XMarkIcon,
+  UserGroupIcon,
 } from "@heroicons/react/24/outline";
 import { SkeletonSidebarItems } from "./Skeleton";
+
+/* ─── Channel member type ───────────────────────────────────── */
+type ChannelMember = { _id: string; firstName: string; lastName: string; email?: string };
+type StoredChannel = {
+  id: string;
+  name: string;
+  members?: ChannelMember[];
+  isPrivate?: boolean;
+  createdBy?: string;
+  joinedMemberIds?: string[];
+};
 
 interface SidebarProps {
   userRole?: "admin" | "user";
 }
 
 type User = {
+  _id?: string;
+  id?: string;
   firstName: string;
   lastName: string;
   email: string;
@@ -225,11 +241,10 @@ function ContentPanelItem({
   const handleClick = () => { if (href && onNavigate) onNavigate(href); };
   return (
     <div
-      className={`flex items-center justify-between px-2 py-1.5 rounded-md transition-all duration-150 group ${
-        active
-          ? "bg-[var(--accent-light)] text-[var(--accent)]"
-          : "text-[var(--text-secondary)] hover:bg-[var(--bg-surface-2)] hover:text-[var(--text-primary)]"
-      } ${href ? "cursor-pointer" : ""}`}
+      className={`flex items-center justify-between px-2 py-1.5 rounded-md transition-all duration-150 group ${active
+        ? "bg-[var(--accent-light)] text-[var(--accent)]"
+        : "text-[var(--text-secondary)] hover:bg-[var(--bg-surface-2)] hover:text-[var(--text-primary)]"
+        } ${href ? "cursor-pointer" : ""}`}
       onClick={handleClick}
     >
       <div className="flex items-center gap-2 overflow-hidden flex-1">
@@ -275,9 +290,8 @@ function ProjectSidebarItem({
 
   return (
     <div className="select-none">
-      <div className={`flex items-center justify-between px-2 py-1.5 rounded-md hover:bg-[var(--bg-surface-2)] group cursor-pointer transition-all ${
-        isActive ? "bg-[var(--accent-light)] text-[var(--accent)]" : "text-[var(--text-secondary)]"
-      }`}>
+      <div className={`flex items-center justify-between px-2 py-1.5 rounded-md hover:bg-[var(--bg-surface-2)] group cursor-pointer transition-all ${isActive ? "bg-[var(--accent-light)] text-[var(--accent)]" : "text-[var(--text-secondary)]"
+        }`}>
         <button
           onClick={(e) => { e.preventDefault(); e.stopPropagation(); setExpanded(!expanded); }}
           className="p-0 mr-1 text-[var(--text-muted)] hover:text-[var(--text-secondary)] flex-shrink-0"
@@ -354,12 +368,20 @@ export default function Sidebar({ userRole }: SidebarProps) {
   const [myProjectsOpen, setMyProjectsOpen] = useState(true);
 
   // Channels state
-  const [channels, setChannels] = useState<{id: string, name: string}[]>([]);
+  const [channels, setChannels] = useState<StoredChannel[]>([]);
   const [channelsOpen, setChannelsOpen] = useState(true);
-  const [isAddingChannel, setIsAddingChannel] = useState(false);
+
+  // Create-channel modal
+  const [isChannelModalOpen, setIsChannelModalOpen] = useState(false);
   const [newChannelName, setNewChannelName] = useState("");
+  const [newChannelPrivacy, setNewChannelPrivacy] = useState<"public" | "private">("public");
+  const [allUsers, setAllUsers] = useState<ChannelMember[]>([]);
+  const [selectedMembers, setSelectedMembers] = useState<ChannelMember[]>([]);
+  const [memberSearch, setMemberSearch] = useState("");
+  const [usersLoading, setUsersLoading] = useState(false);
 
   const [isMounted, setIsMounted] = useState(false);
+  const currentUserId = (user as (User & { _id?: string; id?: string }) | null)?._id || (user as (User & { _id?: string; id?: string }) | null)?.id || "";
 
   // Fetch projects
   const isAdmin = userRole === "admin";
@@ -376,7 +398,7 @@ export default function Sidebar({ userRole }: SidebarProps) {
   useEffect(() => {
     const storedUser = localStorage.getItem("user");
     if (storedUser) {
-      try { setUser(JSON.parse(storedUser)); } catch {}
+      try { setUser(JSON.parse(storedUser)); } catch { }
     }
     if (typeof window !== "undefined") {
       const storedTheme = localStorage.getItem("theme-mode");
@@ -384,27 +406,102 @@ export default function Sidebar({ userRole }: SidebarProps) {
       setIsDarkMode(isDark);
       if (isDark) document.documentElement.classList.add("dark");
       else document.documentElement.classList.remove("dark");
-
-      const storedChannels = localStorage.getItem("ck-channels");
-      if (storedChannels) {
-        try { setChannels(JSON.parse(storedChannels)); } catch {}
-      } else {
-        setChannels([{ id: "general", name: "General" }, { id: "welcome", name: "Welcome" }]);
-      }
     }
   }, []);
 
-  const handleAddChannel = () => {
+  useEffect(() => {
+    const loadChannels = async () => {
+      try {
+        const data = await channelsApi.getChannels();
+        setChannels(data as unknown as StoredChannel[]);
+      } catch (error) {
+        console.error("Failed to load channels", error);
+        setChannels([]);
+      }
+    };
+
+    loadChannels();
+  }, []);
+
+  const openChannelModal = async () => {
+    setIsChannelModalOpen(true);
+    setNewChannelName("");
+    setNewChannelPrivacy("public");
+    setSelectedMembers([]);
+    setMemberSearch("");
+    // Fetch users
+    setUsersLoading(true);
+    try {
+      const users = await channelsApi.getUsers();
+      setAllUsers(users);
+    } catch (_) {
+      setAllUsers([]);
+    } finally {
+      setUsersLoading(false);
+    }
+  };
+
+  const handleCreateChannel = async () => {
     if (!newChannelName.trim()) {
-      setIsAddingChannel(false);
+      setIsChannelModalOpen(false);
       return;
     }
-    const newChan = { id: newChannelName.toLowerCase().replace(/\s+/g, '-'), name: newChannelName.trim() };
-    const updated = [...channels, newChan];
-    setChannels(updated);
-    localStorage.setItem("ck-channels", JSON.stringify(updated));
-    setNewChannelName("");
-    setIsAddingChannel(false);
+
+    const creator: ChannelMember | null = user
+      ? {
+        _id: currentUserId || "me",
+        firstName: user.firstName,
+        lastName: user.lastName,
+        email: user.email,
+      }
+      : null;
+
+    const baseMembers = newChannelPrivacy === "private" ? selectedMembers : [];
+    const allChannelMembers = creator
+      ? [creator, ...baseMembers.filter((m) => m._id !== creator._id)]
+      : baseMembers;
+
+    try {
+      const created = await channelsApi.createChannel({
+        name: newChannelName.trim(),
+        isPrivate: newChannelPrivacy === "private",
+        members: (newChannelPrivacy === "private" ? allChannelMembers : []).map((m) => m._id),
+      });
+
+      setChannels((prev) => [...prev, created as unknown as StoredChannel]);
+      setNewChannelName("");
+      setNewChannelPrivacy("public");
+      setSelectedMembers([]);
+      setIsChannelModalOpen(false);
+      navigateTo(`/dashboard/channels/${created.id}`);
+    } catch (error) {
+      console.error("Failed to create channel", error);
+    }
+  };
+
+  const joinChannel = async (channelId: string) => {
+    if (!currentUserId) return;
+
+    try {
+      const joinedChannel = await channelsApi.joinChannel(channelId);
+      setChannels((prev) => prev.map((chan) => (chan.id === channelId ? (joinedChannel as unknown as StoredChannel) : chan)));
+    } catch (error) {
+      console.error("Failed to join channel", error);
+    }
+  };
+
+  const visibleChannels = useMemo(() => {
+    return channels.filter((chan) => {
+      if (!chan.isPrivate) return true;
+      if (!currentUserId) return false;
+      return (chan.members || []).some((m) => m._id === currentUserId);
+    });
+  }, [channels, currentUserId]);
+
+  const toggleMember = (u: ChannelMember) => {
+    setSelectedMembers((prev) =>
+      prev.find((m) => m._id === u._id) ? prev.filter((m) => m._id !== u._id) : [...prev, u]
+    );
   };
 
   useEffect(() => {
@@ -487,9 +584,9 @@ export default function Sidebar({ userRole }: SidebarProps) {
 
       {/* Inbox / Quick items */}
       {[
-        { label: "Inbox", href: "/dashboard", icon: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.45 5.11L2 12v6a2 2 0 002 2h16a2 2 0 002-2v-6l-3.45-6.89A2 2 0 0016.76 4H7.24a2 2 0 00-1.79 1.11z"/></svg> },
-        { label: "Replies", href: "/dashboard", icon: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="9 17 4 12 9 7"/><path d="M20 18v-2a4 4 0 00-4-4H4"/></svg> },
-        { label: "Assigned Comments", href: "/dashboard", icon: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg> },
+        { label: "Inbox", href: "/dashboard", icon: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M22 12h-6l-2 3h-4l-2-3H2" /><path d="M5.45 5.11L2 12v6a2 2 0 002 2h16a2 2 0 002-2v-6l-3.45-6.89A2 2 0 0016.76 4H7.24a2 2 0 00-1.79 1.11z" /></svg> },
+        { label: "Replies", href: "/dashboard", icon: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="9 17 4 12 9 7" /><path d="M20 18v-2a4 4 0 00-4-4H4" /></svg> },
+        { label: "Assigned Comments", href: "/dashboard", icon: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z" /></svg> },
         { label: "My Tasks", href: "/dashboard/tasks", icon: <ClipboardDocumentListIcon className="w-3.5 h-3.5" /> },
       ].map((item) => (
         <ContentPanelItem key={item.label} href={item.href} label={item.label} icon={item.icon} active={pathname === item.href && item.href !== "/dashboard"} onNavigate={navigateTo} />
@@ -501,9 +598,9 @@ export default function Sidebar({ userRole }: SidebarProps) {
       <div className="flex items-center justify-between px-2 py-1 mt-2">
         <span className="text-[11px] font-semibold text-[var(--text-muted)] uppercase tracking-wider">Channels</span>
         <button
-          onClick={() => { setChannelsOpen(true); setIsAddingChannel(true); }}
+          onClick={openChannelModal}
           className="p-1 rounded hover:bg-[var(--bg-surface-2)] text-[var(--text-muted)]"
-          title="Add Channel"
+          title="New Channel"
         >
           <PlusIcon className="w-3 h-3" />
         </button>
@@ -511,46 +608,58 @@ export default function Sidebar({ userRole }: SidebarProps) {
 
       {isMounted && channelsOpen && (
         <div className="space-y-0.5 mt-1">
-          {channels.map((chan) => (
-            <ContentPanelItem
-              key={chan.id}
-              href={`/dashboard/channels/${chan.id}`}
-              label={chan.name}
-              active={pathname === `/dashboard/channels/${chan.id}`}
-              onNavigate={navigateTo}
-              icon={<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-[var(--text-muted)]"><path d="M4 9h16 M4 15h16 M10 3L8 21 M16 3l-2 18"/></svg>}
-            />
-          ))}
-          {isAddingChannel && (
-            <div className="px-2 py-1 flex items-center gap-2">
-               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-[var(--text-tertiary)]"><path d="M4 9h16 M4 15h16 M10 3L8 21 M16 3l-2 18"/></svg>
-               <input
-                 autoFocus
-                 type="text"
-                 value={newChannelName}
-                 onChange={(e) => setNewChannelName(e.target.value)}
-                 onKeyDown={(e) => {
-                   if (e.key === "Enter") handleAddChannel();
-                   if (e.key === "Escape") { setIsAddingChannel(false); setNewChannelName(""); }
-                 }}
-                 onBlur={() => {
-                   if (newChannelName.trim()) handleAddChannel();
-                   else setIsAddingChannel(false);
-                 }}
-                 placeholder="Channel name"
-                 className="flex-1 bg-transparent outline-none text-[12px] text-[var(--text-primary)] border-b border-[var(--ck-blue)]"
-               />
-            </div>
-          )}
-          {!isAddingChannel && (
-            <button
-              onClick={() => setIsAddingChannel(true)}
-              className="flex items-center gap-2 px-2 py-1.5 w-full text-left hover:bg-[var(--bg-surface-2)] rounded-md transition-colors group"
-            >
-              <PlusIcon className="w-3.5 h-3.5 text-[var(--text-tertiary)] group-hover:text-[var(--text-primary)] transition-colors" />
-              <span className="text-[12px] text-[var(--text-tertiary)] group-hover:text-[var(--text-primary)] transition-colors">Add Channel</span>
-            </button>
-          )}
+          {visibleChannels.map((chan) => {
+            const isActive = pathname === `/dashboard/channels/${chan.id}`;
+            const isJoined = !!currentUserId && (chan.joinedMemberIds || []).includes(currentUserId);
+            const showJoin = !isJoined;
+            return (
+              <div
+                key={chan.id}
+                className={`flex items-center justify-between px-2 py-1.5 rounded-md transition-all duration-150 group ${isActive
+                  ? "bg-[var(--accent-light)] text-[var(--accent)]"
+                  : "text-[var(--text-secondary)] hover:bg-[var(--bg-surface-2)] hover:text-[var(--text-primary)]"
+                  }`}
+              >
+                <button
+                  onClick={() => navigateTo(`/dashboard/channels/${chan.id}`)}
+                  className="flex items-center gap-2 overflow-hidden flex-1 min-w-0 text-left"
+                >
+                  <div className={`flex-shrink-0 ${isActive ? "text-[var(--accent)]" : "text-[var(--text-muted)] group-hover:text-[var(--text-secondary)]"}`}>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 9h16 M4 15h16 M10 3L8 21 M16 3l-2 18" /></svg>
+                  </div>
+                  <span className="truncate text-[12px] font-medium">{chan.name}</span>
+                  {chan.isPrivate && (
+                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-[var(--text-muted)] flex-shrink-0">
+                      <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+                      <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                    </svg>
+                  )}
+                </button>
+
+                {showJoin ? (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      joinChannel(chan.id);
+                    }}
+                    className="ml-2 px-2 py-0.5 rounded text-[10px] font-semibold bg-[var(--bg-surface-3)] text-[var(--text-secondary)] opacity-0 group-hover:opacity-100 hover:bg-[var(--ck-blue)] hover:text-white transition-all"
+                    title="Join channel"
+                  >
+                    Join
+                  </button>
+                ) : (
+                  <div className="ml-2 w-9" />
+                )}
+              </div>
+            );
+          })}
+          <button
+            onClick={openChannelModal}
+            className="flex items-center gap-2 px-2 py-1.5 w-full text-left hover:bg-[var(--bg-surface-2)] rounded-md transition-colors group"
+          >
+            <PlusIcon className="w-3.5 h-3.5 text-[var(--text-tertiary)] group-hover:text-[var(--text-primary)] transition-colors" />
+            <span className="text-[12px] text-[var(--text-tertiary)] group-hover:text-[var(--text-primary)] transition-colors">Add Channel</span>
+          </button>
         </div>
       )}
 
@@ -619,7 +728,7 @@ export default function Sidebar({ userRole }: SidebarProps) {
       <div className="space-y-0.5">
         {[
           { label: "All Teams", icon: <UsersIcon className="w-3.5 h-3.5" />, count: 1 },
-          { label: "All People", icon: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="8" r="4"/><path d="M4 20a8 8 0 1 1 16 0"/></svg>, count: 1 },
+          { label: "All People", icon: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="8" r="4" /><path d="M4 20a8 8 0 1 1 16 0" /></svg>, count: 1 },
           { label: "Analytics", icon: <ChartBarIcon className="w-3.5 h-3.5" /> },
         ].map((item) => (
           <ContentPanelItem key={item.label} label={item.label} icon={item.icon} rightText={item.count ? String(item.count) : undefined} onNavigate={navigateTo} />
@@ -715,11 +824,10 @@ export default function Sidebar({ userRole }: SidebarProps) {
                     if (item.href) navigateTo(item.href);
                   }}
                   title={item.label}
-                  className={`w-full flex flex-col items-center justify-center py-2 px-1 rounded-lg transition-all duration-150 group relative ${
-                    isActive
-                      ? "bg-white/10 text-white"
-                      : "text-gray-400 hover:text-white hover:bg-white/6"
-                  }`}
+                  className={`w-full flex flex-col items-center justify-center py-2 px-1 rounded-lg transition-all duration-150 group relative ${isActive
+                    ? "bg-white/10 text-white"
+                    : "text-gray-400 hover:text-white hover:bg-white/6"
+                    }`}
                 >
                   <div className={`transition-transform group-hover:scale-110 ${isActive ? "text-white" : "text-gray-400"}`}>
                     {item.icon}
@@ -835,6 +943,153 @@ export default function Sidebar({ userRole }: SidebarProps) {
           )}
         </div>
       </div>
+
+      {/* ── Create Channel Modal ── */}
+      {isChannelModalOpen && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 backdrop-blur-sm" onClick={() => setIsChannelModalOpen(false)}>
+          <div
+            className="w-full max-w-[480px] rounded-xl bg-white shadow-2xl overflow-hidden animate-fade-in flex flex-col"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header / Subheader */}
+            <div className="relative pt-6 px-7 pb-2">
+              <button
+                onClick={() => setIsChannelModalOpen(false)}
+                className="absolute top-4 right-4 p-1.5 rounded-full bg-gray-100 hover:bg-gray-200 text-gray-500 transition-colors"
+              >
+                <XMarkIcon className="w-4 h-4" />
+              </button>
+              <h2 className="text-[18px] font-bold text-gray-900 mb-1.5">Create Channel</h2>
+              <p className="text-[13px] leading-relaxed text-gray-500 pr-4">
+                Chat Channels are where conversations happen. Use a name that is easy to find and understand.
+              </p>
+            </div>
+
+            <div className="px-7 py-4 space-y-6">
+              {/* Channel name */}
+              <div>
+                <label className="block text-[13px] font-semibold text-gray-700 mb-1.5">
+                  Name <span className="text-red-500">*</span>
+                </label>
+                <input
+                  autoFocus
+                  type="text"
+                  value={newChannelName}
+                  onChange={(e) => setNewChannelName(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter") handleCreateChannel(); if (e.key === "Escape") setIsChannelModalOpen(false); }}
+                  placeholder="e.g. Ideas"
+                  className="w-full px-3 py-2 rounded-lg border border-gray-300 text-[13px] text-gray-900 placeholder-gray-400 outline-none focus:border-gray-500 focus:ring-1 focus:ring-gray-500 transition-all shadow-sm"
+                />
+              </div>
+
+              {/* Privacy */}
+              <div className="space-y-3">
+                <div>
+                  <h3 className="text-[14px] font-semibold text-gray-800">Channel Privacy</h3>
+                  <p className="text-[13px] text-gray-500">Private channels are visible only to invited members.</p>
+                </div>
+
+                <div className="flex items-center gap-4">
+                  <label className="inline-flex items-center gap-2 text-[13px] text-gray-700 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="channelPrivacy"
+                      checked={newChannelPrivacy === "public"}
+                      onChange={() => setNewChannelPrivacy("public")}
+                      className="accent-gray-800"
+                    />
+                    Public
+                  </label>
+                  <label className="inline-flex items-center gap-2 text-[13px] text-gray-700 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="channelPrivacy"
+                      checked={newChannelPrivacy === "private"}
+                      onChange={() => setNewChannelPrivacy("private")}
+                      className="accent-gray-800"
+                    />
+                    Private
+                  </label>
+                </div>
+              </div>
+
+              {newChannelPrivacy === "private" && (
+                <div className="space-y-3">
+                  <div>
+                    <h3 className="text-[14px] font-semibold text-gray-800">Invite Members</h3>
+                    <p className="text-[13px] text-gray-500">Only selected users can view and message in this channel.</p>
+                  </div>
+
+                  <input
+                    type="text"
+                    value={memberSearch}
+                    onChange={(e) => setMemberSearch(e.target.value)}
+                    placeholder="Search by name or email"
+                    className="w-full px-3 py-2 rounded-lg border border-gray-300 text-[13px] text-gray-900 placeholder-gray-400 outline-none focus:border-gray-500 focus:ring-1 focus:ring-gray-500 transition-all shadow-sm"
+                  />
+
+                  <div className="max-h-40 overflow-y-auto border border-gray-200 rounded-lg divide-y divide-gray-100">
+                    {usersLoading ? (
+                      <div className="px-3 py-2 text-[12px] text-gray-500">Loading users...</div>
+                    ) : allUsers
+                      .filter((u) => `${u.firstName} ${u.lastName} ${u.email || ""}`.toLowerCase().includes(memberSearch.toLowerCase()))
+                      .map((u) => {
+                        const checked = selectedMembers.some((m) => m._id === u._id);
+                        return (
+                          <label key={u._id} className="flex items-center justify-between gap-2 px-3 py-2 cursor-pointer hover:bg-gray-50">
+                            <div className="min-w-0">
+                              <p className="text-[13px] font-medium text-gray-800 truncate">{u.firstName} {u.lastName}</p>
+                              {u.email && <p className="text-[11px] text-gray-500 truncate">{u.email}</p>}
+                            </div>
+                            <input
+                              type="checkbox"
+                              checked={checked}
+                              onChange={() => toggleMember(u)}
+                              className="accent-gray-800"
+                            />
+                          </label>
+                        );
+                      })}
+                  </div>
+
+                  {selectedMembers.length > 0 && (
+                    <div className="flex flex-wrap gap-1.5">
+                      {selectedMembers.map((m) => (
+                        <span key={m._id} className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-gray-100 text-[11px] text-gray-700">
+                          {m.firstName}
+                          <button onClick={() => toggleMember(m)} className="text-gray-500 hover:text-gray-700">x</button>
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Footer */}
+            <div className="flex items-center justify-between px-7 py-5 mt-2 border-t border-gray-100">
+              <button
+                className="flex items-center justify-center gap-2 px-4 py-2 rounded-lg border border-gray-200 text-[13px] font-semibold text-gray-700 hover:bg-gray-50 transition-colors shadow-sm"
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M5.042 15.165a2.528 2.528 0 0 1-2.52 2.523A2.528 2.528 0 0 1 0 15.165a2.527 2.527 0 0 1 2.522-2.52h2.52v2.52zm1.271 0a2.527 2.527 0 0 1 2.521-2.523 2.527 2.527 0 0 1 2.521 2.523v6.313A2.528 2.528 0 0 1 8.834 24a2.528 2.528 0 0 1-2.521-2.522v-6.313zM8.834 5.042a2.528 2.528 0 0 1-2.521-2.52A2.528 2.528 0 0 1 8.834 0a2.528 2.528 0 0 1 2.521 2.522v2.52H8.834zm0 1.271a2.528 2.528 0 0 1 2.521 2.521 2.527 2.527 0 0 1-2.521 2.521H2.522A2.528 2.528 0 0 1 0 8.834a2.528 2.528 0 0 1 2.522-2.521h6.312zM18.956 8.834a2.528 2.528 0 0 1 2.522-2.521A2.528 2.528 0 0 1 24 8.834a2.528 2.528 0 0 1-2.522 2.521h-2.522v-2.521zm-1.272 0a2.528 2.528 0 0 1-2.521 2.521 2.527 2.527 0 0 1-2.521-2.521V2.521A2.528 2.528 0 0 1 15.164 0a2.528 2.528 0 0 1 2.521 2.522v6.312zM15.166 18.958a2.528 2.528 0 0 1 2.521 2.522A2.528 2.528 0 0 1 15.166 24a2.527 2.527 0 0 1-2.521-2.522v-2.52h2.521zm0-1.271a2.527 2.527 0 0 1-2.521-2.522 2.528 2.528 0 0 1 2.521-2.521h6.312A2.528 2.528 0 0 1 24 15.166a2.528 2.528 0 0 1-2.522 2.521h-6.312z" fill="#E5B217" />
+                  <path d="M5.042 15.165a2.528 2.528 0 0 1-2.52 2.523A2.528 2.528 0 0 1 0 15.165a2.527 2.527 0 0 1 2.522-2.52h2.52v2.52zm1.271 0a2.527 2.527 0 0 1 2.521-2.523 2.527 2.527 0 0 1 2.521 2.523v6.313A2.528 2.528 0 0 1 8.834 24a2.528 2.528 0 0 1-2.521-2.522v-6.313z" fill="#e01e5a" />
+                  <path d="M8.834 5.042a2.528 2.528 0 0 1-2.521-2.52A2.528 2.528 0 0 1 8.834 0a2.528 2.528 0 0 1 2.521 2.522v2.52H8.834zm0 1.271a2.528 2.528 0 0 1 2.521 2.521 2.527 2.527 0 0 1-2.521 2.521H2.522A2.528 2.528 0 0 1 0 8.834a2.528 2.528 0 0 1 2.522-2.521h6.312z" fill="#36c5f0" />
+                  <path d="M18.956 8.834a2.528 2.528 0 0 1 2.522-2.521A2.528 2.528 0 0 1 24 8.834a2.528 2.528 0 0 1-2.522 2.521h-2.522v-2.521zm-1.272 0a2.528 2.528 0 0 1-2.521 2.521 2.527 2.527 0 0 1-2.521-2.521V2.521A2.528 2.528 0 0 1 15.164 0a2.528 2.528 0 0 1 2.521 2.522v6.312z" fill="#2eb67d" />
+                </svg>
+                Import
+              </button>
+              <button
+                onClick={handleCreateChannel}
+                disabled={!newChannelName.trim()}
+                className="px-6 py-2.5 rounded-lg text-[13px] font-bold bg-[#1d1c1d] hover:bg-black text-white transition-colors disabled:opacity-40 disabled:cursor-not-allowed shadow-sm"
+              >
+                Create
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Change Password Modal */}
       {isPasswordModalOpen && (

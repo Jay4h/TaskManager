@@ -1,280 +1,921 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef, useCallback, useMemo } from "react";
 import { useParams } from "next/navigation";
-import { 
-  PhoneIcon, 
+import {
+  PhoneIcon,
   VideoCameraIcon,
   PlusIcon,
-  DocumentIcon,
-  UserPlusIcon,
   PaperClipIcon,
-  FaceSmileIcon
+  FaceSmileIcon,
+  HashtagIcon,
+  UserGroupIcon,
+  ChevronRightIcon,
 } from "@heroicons/react/24/outline";
 import { io, Socket } from "socket.io-client";
-import axios from "axios";
-import { useRef } from "react";
+import { channelsApi } from "../../../../src/api/channels.api";
 
+/* ─── Types ─────────────────────────────────────────────────── */
+interface Member {
+  _id: string;
+  firstName: string;
+  lastName: string;
+  email?: string;
+}
+
+interface Message {
+  _id?: string;
+  channelId?: string;
+  text: string;
+  sender: Member | null;
+  createdAt: string | Date;
+  local?: boolean; // optimistic
+}
+
+interface StoredChannel {
+  id: string;
+  name: string;
+  members?: Member[];
+  isPrivate?: boolean;
+  createdBy?: string;
+  joinedMemberIds?: string[];
+}
+
+/* ─── Toast ──────────────────────────────────────────────────── */
+type ToastType = "success" | "error" | "info";
+interface Toast {
+  id: number;
+  message: string;
+  type: ToastType;
+}
+
+function ToastContainer({ toasts, remove }: { toasts: Toast[]; remove: (id: number) => void }) {
+  return (
+    <div className="fixed bottom-6 right-6 z-50 flex flex-col gap-2 pointer-events-none">
+      {toasts.map((t) => (
+        <div
+          key={t.id}
+          className={`pointer-events-auto flex items-center gap-3 px-4 py-3 rounded-xl shadow-2xl text-[13px] font-medium border backdrop-blur-md animate-toast-in
+            ${t.type === "success"
+              ? "bg-emerald-950/90 border-emerald-700/50 text-emerald-200"
+              : t.type === "error"
+                ? "bg-red-950/90 border-red-700/50 text-red-200"
+                : "bg-[#1e1f26]/90 border-[#36374a] text-gray-200"
+            }`}
+        >
+          <span>
+            {t.type === "success" ? "✓" : t.type === "error" ? "✕" : "ℹ"}
+          </span>
+          <span>{t.message}</span>
+          <button
+            onClick={() => remove(t.id)}
+            className="ml-2 opacity-60 hover:opacity-100 transition-opacity text-[11px]"
+          >
+            ✕
+          </button>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function useToast() {
+  const [toasts, setToasts] = useState<Toast[]>([]);
+  const counter = useRef(0);
+  const add = useCallback((message: string, type: ToastType = "info", duration = 3000) => {
+    const id = ++counter.current;
+    setToasts((p) => [...p, { id, message, type }]);
+    setTimeout(() => setToasts((p) => p.filter((t) => t.id !== id)), duration);
+  }, []);
+  const remove = useCallback((id: number) => setToasts((p) => p.filter((t) => t.id !== id)), []);
+  return { toasts, add, remove };
+}
+
+/* ─── Avatar helper ─────────────────────────────────────────── */
+const AVATAR_COLORS = [
+  "bg-[#2B2B2B]", // Dark Grey (like the JT example)
+];
+function avatarColor(name: string) {
+  let h = 0;
+  for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) & 0xffff;
+  return AVATAR_COLORS[Math.abs(h) % AVATAR_COLORS.length];
+}
+
+function Avatar({ name, size = "md" }: { name: string; size?: "sm" | "md" | "lg" }) {
+  const initials = name
+    .split(" ")
+    .map((p) => p[0])
+    .join("")
+    .toUpperCase()
+    .slice(0, 2);
+  const sizeClass = size === "sm" ? "w-7 h-7 text-[10px]" : size === "lg" ? "w-10 h-10 text-[13px]" : "w-8 h-8 text-[11px]";
+  return (
+    <div
+      className={`${sizeClass} rounded-full ${avatarColor(name)} flex items-center justify-center font-semibold text-white flex-shrink-0 shadow-sm`}
+    >
+      {initials}
+    </div>
+  );
+}
+
+/* ─── @Mention Dropdown ─────────────────────────────────────── */
+function MentionDropdown({
+  members,
+  query,
+  onSelect,
+  visible,
+}: {
+  members: Member[];
+  query: string;
+  onSelect: (m: Member) => void;
+  visible: boolean;
+}) {
+  const filtered = members.filter((m) =>
+    `${m.firstName} ${m.lastName}`.toLowerCase().includes(query.toLowerCase())
+  );
+  if (!visible || filtered.length === 0) return null;
+  return (
+    <div className="absolute bottom-full left-0 mb-2 w-64 bg-[var(--bg-canvas)] border border-[var(--border-subtle)] rounded-xl shadow-lg overflow-hidden z-50">
+      <div className="px-3 py-2 border-b border-[var(--border-subtle)]">
+        <span className="text-[11px] text-[var(--text-tertiary)] uppercase tracking-wider font-semibold">Members</span>
+      </div>
+      <div className="max-h-52 overflow-y-auto">
+        {filtered.map((m) => (
+          <button
+            key={m._id}
+            onMouseDown={(e) => { e.preventDefault(); onSelect(m); }}
+            className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-[var(--bg-surface-2)] transition-colors text-left"
+          >
+            <Avatar name={`${m.firstName} ${m.lastName}`} size="sm" />
+            <div>
+              <span className="text-[13px] font-medium text-[var(--text-primary)]">{m.firstName} {m.lastName}</span>
+              {m.email && <p className="text-[11px] text-[var(--text-tertiary)] truncate">{m.email}</p>}
+            </div>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/* ─── Message bubble group ──────────────────────────────────── */
+interface MessageGroup {
+  sender: Member | null;
+  messages: Message[];
+  isMe: boolean;
+}
+
+function groupMessages(messages: Message[], currentUserId: string): MessageGroup[] {
+  const groups: MessageGroup[] = [];
+  for (const msg of messages) {
+    const isMe = msg.sender?._id === currentUserId;
+    const last = groups[groups.length - 1];
+    if (last && last.sender?._id === msg.sender?._id) {
+      last.messages.push(msg);
+    } else {
+      groups.push({ sender: msg.sender, messages: [msg], isMe });
+    }
+  }
+  return groups;
+}
+
+function formatTime(d: string | Date) {
+  return new Date(d).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+}
+function formatDateDivider(d: string | Date) {
+  const date = new Date(d);
+  const today = new Date();
+  if (date.toDateString() === today.toDateString()) return "Today";
+  const yesterday = new Date(today);
+  yesterday.setDate(today.getDate() - 1);
+  if (date.toDateString() === yesterday.toDateString()) return "Yesterday";
+  return date.toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" });
+}
+function shouldShowDivider(prev: Message | undefined, curr: Message) {
+  if (!prev) return true;
+  return new Date(prev.createdAt).toDateString() !== new Date(curr.createdAt).toDateString();
+}
+
+function DateDivider({ label }: { label: string }) {
+  return (
+    <div className="flex items-center gap-3 my-4 px-4">
+      <div className="flex-1 h-px bg-[#2e2f3e]" />
+      <span className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider px-2">{label}</span>
+      <div className="flex-1 h-px bg-[#2e2f3e]" />
+    </div>
+  );
+}
+
+/* ─── Main Page ─────────────────────────────────────────────── */
 export default function ChannelPage() {
   const params = useParams();
   const id = params.id as string;
-  const channelName = id.charAt(0).toUpperCase() + id.slice(1).replace(/-/g, ' ');
+  const channelName = id.charAt(0).toUpperCase() + id.slice(1).replace(/-/g, " ");
 
-  const [workspaceName, setWorkspaceName] = useState("Jay thakkar's Workspace");
-
-  const [messages, setMessages] = useState<any[]>([]);
+  const [messages, setMessages] = useState<Message[]>([]);
   const [newMessage, setNewMessage] = useState("");
   const [socket, setSocket] = useState<Socket | null>(null);
+  const [members, setMembers] = useState<Member[]>([]);
+  const [channelConfig, setChannelConfig] = useState<StoredChannel | null>(null);
+  const [currentUser, setCurrentUser] = useState<Member | null>(null);
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [activePeopleTab, setActivePeopleTab] = useState<"followers" | "access">("followers");
+  const [membersOpen, setMembersOpen] = useState(true);
+  const [mentionQuery, setMentionQuery] = useState("");
+  const [mentionVisible, setMentionVisible] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [showBanner, setShowBanner] = useState(true);
+  const [isJoiningChannel, setIsJoiningChannel] = useState(false);
+  const [hideJoinPrompt, setHideJoinPrompt] = useState(false);
+
+  // Add Member feature state
+  const [allUsers, setAllUsers] = useState<Member[]>([]);
+  const [addMemberQuery, setAddMemberQuery] = useState("");
+
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const userRef = useRef<any>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const memberSearchRef = useRef<HTMLInputElement>(null);
+  const { toasts, add: addToast, remove: removeToast } = useToast();
 
-  const scrollToBottom = () => {
+  /* ---------- scroll to bottom ---------- */
+  const scrollToBottom = useCallback(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  };
-  
-  useEffect(() => { scrollToBottom(); }, [messages]);
+  }, []);
+  useEffect(() => { scrollToBottom(); }, [messages, scrollToBottom]);
 
+  /* ---------- load user + channel + messages ---------- */
   useEffect(() => {
     const userStr = localStorage.getItem("user");
     if (userStr) {
       try {
-        const parsed = JSON.parse(userStr);
-        if (parsed.firstName) setWorkspaceName(`${parsed.firstName}'s Workspace`);
-        userRef.current = parsed;
-      } catch (e) {}
+        const parsed = JSON.parse(userStr) as {
+          _id?: string;
+          id?: string;
+          firstName?: string;
+          lastName?: string;
+          name?: string;
+          email?: string;
+          role?: string;
+        };
+
+        const fallbackName = (parsed.name || "").trim().split(/\s+/).filter(Boolean);
+        setCurrentUser({
+          _id: parsed._id || parsed.id || "me",
+          firstName: parsed.firstName || fallbackName[0] || "User",
+          lastName: parsed.lastName || fallbackName.slice(1).join(" "),
+          email: parsed.email,
+        });
+        setIsAdmin(parsed.role === "admin");
+      } catch (_) { }
     }
 
-    const fetchHistory = async () => {
+    // Fetch channel details and conditionally load messages only for joined users
+    const fetchChannelAndHistory = async () => {
       try {
-         const token = localStorage.getItem("token");
-         const res = await axios.get(`http://localhost:5000/api/channels/${id}/messages`, {
-            headers: { Authorization: `Bearer ${token}` }
-         });
-         setMessages(res.data);
-      } catch (err) { console.error("Failed to load history", err); }
-    };
-    fetchHistory();
+        const channel = await channelsApi.getChannel(id);
+        setChannelConfig(channel as unknown as StoredChannel);
+        setMembers((channel.members || []) as Member[]);
 
-    const newSocket = io("http://localhost:5000");
+        if ((channel.joinedMemberIds || []).some((memberId) => memberId === (currentUser?._id || ""))) {
+          const history = await channelsApi.getMessages(id);
+          setMessages(history as Message[]);
+        } else {
+          setMessages([]);
+        }
+      } catch (_) {
+        addToast("Could not load channel data", "error");
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchChannelAndHistory();
+
+    // Fetch all users for inline Add People search
+    const fetchAllUsers = async () => {
+      try {
+        const users = await channelsApi.getUsers();
+        setAllUsers(users as Member[]);
+      } catch (err) {
+        console.error("Failed to fetch users", err);
+      }
+    };
+    fetchAllUsers();
+
+    // Socket
+    const SOCKET_URL =
+      (process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001").replace(/\/api$/, "");
+    const token = localStorage.getItem("token") || "";
+    const newSocket = io(SOCKET_URL, {
+      transports: ["websocket", "polling"],
+      auth: { token },
+    });
     setSocket(newSocket);
-
     newSocket.emit("join_channel", id);
-
-    newSocket.on("receive_message", (msg: any) => {
-       setMessages(prev => [...prev, msg]);
+    newSocket.on("receive_message", (msg: Message) => {
+      setMessages((prev) => {
+        // Avoid duplicate if we already added optimistically by local flag
+        const alreadyExists = prev.some((m) => m.local && m.text === msg.text && m.sender?._id === msg.sender?._id);
+        if (alreadyExists) {
+          return prev.map((m) =>
+            m.local && m.text === msg.text && m.sender?._id === msg.sender?._id ? { ...msg } : m
+          );
+        }
+        return [...prev, msg];
+      });
     });
-
     return () => {
-       newSocket.emit("leave_channel", id);
-       newSocket.disconnect();
+      newSocket.emit("leave_channel", id);
+      newSocket.disconnect();
     };
-  }, [id]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id, currentUser?._id]);
 
+  /* ---------- send message ---------- */
   const handleSendMessage = () => {
-    if (!newMessage.trim() || !socket || !userRef.current) return;
-    socket.emit("send_message", {
-       channelId: id,
-       text: newMessage.trim(),
-       senderId: userRef.current._id || userRef.current.id
-    });
+    if (!canMessageInChannel) {
+      addToast("Join this channel to send messages", "info");
+      return;
+    }
+
+    const text = newMessage.trim();
+    if (!text || !socket || !currentUser) return;
+
+    // Optimistic message
+    const optimistic: Message = {
+      text,
+      sender: currentUser,
+      createdAt: new Date().toISOString(),
+      local: true,
+    };
+    setMessages((prev) => [...prev, optimistic]);
     setNewMessage("");
+    if (textareaRef.current) {
+      textareaRef.current.style.height = "auto";
+    }
+
+    socket.emit("send_message", {
+      channelId: id,
+      text,
+      senderId: currentUser._id,
+    });
+    addToast("Message sent!", "success", 2000);
   };
 
+  /* ---------- handle textarea input (auto-grow + @mention) ---------- */
+  const handleInput = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const val = e.target.value;
+    setNewMessage(val);
+
+    // Auto-grow
+    const ta = e.target;
+    ta.style.height = "auto";
+    ta.style.height = Math.min(ta.scrollHeight, 160) + "px";
+
+    // @mention detection
+    const cursor = ta.selectionStart;
+    const before = val.slice(0, cursor);
+    const match = before.match(/@(\w*)$/);
+    if (match) {
+      setMentionQuery(match[1]);
+      setMentionVisible(true);
+    } else {
+      setMentionVisible(false);
+    }
+  };
+
+  const handleMentionSelect = (m: Member) => {
+    const cursor = textareaRef.current?.selectionStart ?? newMessage.length;
+    const before = newMessage.slice(0, cursor);
+    const after = newMessage.slice(cursor);
+    const withoutAtQuery = before.replace(/@\w*$/, "");
+    const inserted = `@${m.firstName} `;
+    setNewMessage(withoutAtQuery + inserted + after);
+    setMentionVisible(false);
+    setTimeout(() => textareaRef.current?.focus(), 0);
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      if (mentionVisible) return;
+      handleSendMessage();
+    }
+    if (e.key === "Escape") setMentionVisible(false);
+  };
+
+  /* ---------- add member ---------- */
+  const handleAddMember = async (user: Member) => {
+    if (!canManageMembers) {
+      addToast("Only channel creator can add members", "error");
+      return;
+    }
+
+    // Avoid duplicates
+    if (members.find((m) => m._id === user._id)) {
+      addToast("User is already a member", "error");
+      return;
+    }
+
+    try {
+      const updated = await channelsApi.addMember(id, user._id);
+      setChannelConfig(updated as unknown as StoredChannel);
+      setMembers((updated.members || []) as Member[]);
+      addToast(`${user.firstName} ${user.lastName} added to channel`, "success");
+      setAddMemberQuery("");
+      setTimeout(() => memberSearchRef.current?.focus(), 0);
+    } catch {
+      addToast("Failed to add member", "error");
+    }
+  };
+
+  const addableUsers = useMemo(
+    () => allUsers.filter((u) => !members.find((m) => m._id === u._id)),
+    [allUsers, members]
+  );
+
+  const filteredAddableUsers = useMemo(() => {
+    const query = addMemberQuery.trim().toLowerCase();
+    if (!query) return [];
+    return addableUsers.filter((u) =>
+      `${u.firstName} ${u.lastName} ${u.email || ""}`.toLowerCase().includes(query)
+    );
+  }, [addableUsers, addMemberQuery]);
+
+  const canAccessChannel = useMemo(() => {
+    if (!channelConfig) return true;
+    if (!channelConfig.isPrivate) return true;
+    if (!currentUser?._id) return false;
+    return (channelConfig.members || []).some((m) => m._id === currentUser._id);
+  }, [channelConfig, currentUser]);
+
+  const canMessageInChannel = useMemo(() => {
+    if (!canAccessChannel) return false;
+    if (!channelConfig) return true;
+    if (!currentUser?._id) return false;
+    return (channelConfig.joinedMemberIds || []).includes(currentUser._id);
+  }, [canAccessChannel, channelConfig, currentUser]);
+
+  const canManageMembers = useMemo(() => {
+    if (!currentUser?._id || !channelConfig?.createdBy) return false;
+    return channelConfig.createdBy === currentUser._id;
+  }, [channelConfig, currentUser]);
+
+  useEffect(() => {
+    setHideJoinPrompt(false);
+  }, [id]);
+
+  const handleJoinChannel = async () => {
+    if (!currentUser?._id) return;
+    setIsJoiningChannel(true);
+    setHideJoinPrompt(true);
+    try {
+      const joined = await channelsApi.joinChannel(id);
+      setChannelConfig(joined as unknown as StoredChannel);
+      setMembers(((joined as unknown as StoredChannel).members || []) as Member[]);
+      socket?.emit("join_channel", id);
+
+      try {
+        const history = await channelsApi.getMessages(id);
+        setMessages(history as Message[]);
+      } catch {
+        setMessages([]);
+      }
+
+      addToast("You joined this channel", "success");
+    } catch {
+      setHideJoinPrompt(false);
+      addToast("Failed to join channel", "error");
+    } finally {
+      setIsJoiningChannel(false);
+    }
+  };
+
+  const accessMembers = useMemo(() => {
+    if (!channelConfig?.createdBy) {
+      return currentUser ? [currentUser] : ([] as Member[]);
+    }
+
+    const owner = members.find((m) => m._id === channelConfig.createdBy);
+    if (owner) return [owner];
+
+    if (currentUser && currentUser._id === channelConfig.createdBy) return [currentUser];
+    return [] as Member[];
+  }, [channelConfig, members, currentUser]);
+
+  const messageGroups = groupMessages(messages, currentUser?._id ?? "");
+
   return (
-    <div className="flex-1 flex flex-col h-screen overflow-hidden bg-[var(--bg-canvas)]">
-      {/* Top Navigation Header */}
-      <div className="flex-none border-b border-[var(--border-subtle)] bg-[var(--bg-canvas)]">
-        <div className="flex items-center justify-between px-6 py-4">
-          <h1 className="text-[18px] font-bold text-[var(--text-primary)]">{workspaceName}</h1>
-          <div className="flex items-center gap-4">
-            <button className="text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors">
+    <div className="flex h-screen overflow-hidden bg-[var(--bg-canvas)] text-[var(--text-primary)]">
+      {/* ── MAIN CHAT COLUMN ── */}
+      <div className="flex-1 flex flex-col min-w-0">
+
+        {/* Header */}
+        <header className="flex-none h-[56px] flex items-center justify-between px-5 border-b border-[var(--border-subtle)] bg-[var(--bg-canvas)]/95 backdrop-blur-sm z-10">
+          <div className="flex items-center gap-3">
+            <div className="w-7 h-7 rounded-lg bg-[var(--bg-surface-2)] border border-[var(--border-subtle)] flex items-center justify-center">
+              <HashtagIcon className="w-4 h-4 text-[var(--ck-blue)]" />
+            </div>
+            <span className="text-[15px] font-semibold text-[var(--text-primary)]">{channelName}</span>
+            {canMessageInChannel && members.length > 0 && (
+              <span className="text-[12px] text-[var(--text-tertiary)] flex items-center gap-1">
+                <UserGroupIcon className="w-3.5 h-3.5" />
+                {members.length} member{members.length !== 1 ? "s" : ""}
+              </span>
+            )}
+          </div>
+          <div className="flex items-center gap-1.5">
+            <button className="p-2 rounded-lg hover:bg-[var(--bg-surface-2)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors" title="Call">
               <PhoneIcon className="w-4 h-4" />
             </button>
-            <button className="text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors">
-              <VideoCameraIcon className="w-5 h-5" />
+            <button className="p-2 rounded-lg hover:bg-[var(--bg-surface-2)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors" title="Video">
+              <VideoCameraIcon className="w-4 h-4" />
             </button>
-            <div className="w-6 h-6 rounded-full bg-blue-100 dark:bg-blue-900 flex flex-shrink-0 items-center justify-center border border-blue-200 dark:border-blue-800 overflow-hidden text-blue-600 dark:text-blue-400 font-bold text-[10px]">
-              1
-            </div>
-            <button className="px-3 py-1.5 rounded-md bg-[var(--bg-surface-2)] text-[12px] text-[var(--text-secondary)] font-medium hover:bg-[var(--bg-surface)] transition-colors flex items-center gap-1.5">
-              <span className="text-purple-500">✨</span> Ask AI
+            <div className="w-px h-5 bg-[var(--border-subtle)] mx-1" />
+            <button
+              onClick={() => setMembersOpen((o) => !o)}
+              className={`p-2 rounded-lg transition-colors ${membersOpen ? "bg-indigo-500/10 text-indigo-500" : "hover:bg-[var(--bg-surface-2)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]"}`}
+              title="Toggle member list"
+            >
+              <UserGroupIcon className="w-4 h-4" />
             </button>
           </div>
-        </div>
+        </header>
 
-        {/* Tabs */}
-        <div className="px-5 flex items-center gap-1 font-medium text-[13px] overflow-x-auto ck-scrollbar">
-          <button className="flex items-center gap-1.5 px-3 py-2 text-[var(--ck-blue)] border-b-2 border-[var(--ck-blue)] transition-colors">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 9h16 M4 15h16 M10 3L8 21 M16 3l-2 18"/></svg>
-            Channel
-          </button>
-          <button className="flex items-center gap-1.5 px-3 py-2 text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)] rounded-t-md transition-colors border-b-2 border-transparent">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
-            List
-          </button>
-          <button className="flex items-center gap-1.5 px-3 py-2 text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)] rounded-t-md transition-colors border-b-2 border-transparent">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><line x1="9" y1="3" x2="9" y2="21"/><line x1="15" y1="3" x2="15" y2="21"/></svg>
-            Board
-          </button>
-          <button className="flex items-center gap-1.5 px-3 py-2 text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)] rounded-t-md transition-colors border-b-2 border-transparent">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-            Calendar
-          </button>
-          <div className="w-px h-4 bg-[var(--border-subtle)] mx-1" />
-          <button className="flex items-center gap-1.5 px-3 py-2 text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)] rounded-t-md transition-colors border-b-2 border-transparent">
-            <PlusIcon className="w-4 h-4" />
-            View
-          </button>
-        </div>
-      </div>
-
-      {/* Main Channels Content Area (Chat) */}
-      <div className="flex-1 flex flex-col min-h-0 bg-transparent">
-        <div className="flex-1 overflow-y-auto w-full flex justify-center pt-24 pb-12 ck-scrollbar relative">
-          <div className="w-full max-w-[560px] px-6">
-            <h2 className="text-[20px] font-bold text-[var(--text-primary)] mb-2.5 tracking-tight">Chat in #{channelName}</h2>
-            <p className="text-[14px] leading-relaxed text-[var(--text-secondary)] mb-8 max-w-[500px]">
-              Collaborate seamlessly across tasks and conversations. Start chat
-              ting with your team or connect tasks to stay on top of your work.
-            </p>
-
-            {/* Action Buttons */}
-            <div className="flex flex-col gap-3 mb-10 w-[420px] max-w-full relative left-[30px]">
-              <button className="w-full bg-[var(--bg-canvas)] hover:bg-[var(--bg-surface-2)] border border-[var(--border-subtle)] text-[13px] font-medium text-[var(--text-secondary)] rounded-lg py-2.5 flex items-center justify-center gap-2 transition-colors shadow-sm">
-                <PlusIcon className="w-4 h-4" /> Add People
-              </button>
-              <button className="w-full bg-[var(--bg-canvas)] hover:bg-[var(--bg-surface-2)] border border-[var(--border-subtle)] text-[13px] font-medium text-[var(--text-secondary)] rounded-lg py-2.5 flex items-center justify-center gap-2.5 transition-colors shadow-sm">
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M5.042 15.165a2.528 2.528 0 0 1-2.52 2.523A2.528 2.528 0 0 1 0 15.165a2.527 2.527 0 0 1 2.522-2.52h2.52v2.52zM6.313 15.165a2.527 2.527 0 0 1 2.521-2.52 2.527 2.527 0 0 1 2.521 2.52v6.313A2.528 2.528 0 0 1 8.834 24a2.528 2.528 0 0 1-2.521-2.522v-6.313zM8.834 5.042a2.528 2.528 0 0 1 2.521-2.52A2.528 2.528 0 0 1 13.876 5.042a2.527 2.527 0 0 1-2.521 2.52H8.834v-2.52zM8.834 6.313a2.527 2.527 0 0 1 2.521 2.521 2.527 2.527 0 0 1-2.521 2.521H2.522A2.528 2.528 0 0 1 0 8.834a2.528 2.528 0 0 1 2.522-2.521h6.312zM18.956 8.835a2.528 2.528 0 0 1 2.522-2.521A2.528 2.528 0 0 1 24 8.835a2.527 2.527 0 0 1-2.522 2.52h-2.522v-2.52zM17.688 8.835a2.527 2.527 0 0 1-2.523 2.52 2.527 2.527 0 0 1-2.52-2.52V2.522A2.528 2.528 0 0 1 15.165 0a2.528 2.528 0 0 1 2.523 2.522v6.313zM15.165 18.958a2.528 2.528 0 0 1-2.523 2.522A2.528 2.528 0 0 1 10.12 18.958a2.527 2.527 0 0 1 2.521-2.52h2.522v2.52zM15.165 17.687a2.527 2.527 0 0 1-2.523-2.521 2.527 2.527 0 0 1 2.523-2.521h6.313A2.528 2.528 0 0 1 24 15.166a2.528 2.528 0 0 1-2.522 2.521h-6.313z"/></svg> Import from Slack
-              </button>
-            </div>
-
-            {/* Feature Cards block positioned identically to screenshot */}
-            <div className="flex flex-col gap-3.5 w-full max-w-[420px] relative left-[30px]">
-              {/* Track Tasks */}
-              <div className="flex items-center gap-4 py-3 px-4 rounded-[14px] bg-[#fbf5fb] dark:bg-[#322332] hover:shadow-sm border border-transparent transition-all cursor-pointer">
-                <div className="w-8 h-8 rounded-[10px] bg-[#f0daf0] dark:bg-[#4d334d] flex items-center justify-center flex-shrink-0 text-[#c251c2] dark:text-[#eb8feb]">
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
-                </div>
-                <div>
-                  <h3 className="text-[13px] font-bold text-[var(--text-primary)] leading-tight mb-0.5">Track Tasks</h3>
-                  <p className="text-[12px] text-[var(--text-muted)] tracking-wide">Manage tasks, bugs, people, and more</p>
-                </div>
-              </div>
-
-              {/* Add Doc */}
-              <div className="flex items-center gap-4 py-3 px-4 rounded-[14px] bg-[#f5f9fb] dark:bg-[#1a2f3a] hover:shadow-sm border border-transparent transition-all cursor-pointer">
-                <div className="w-8 h-8 rounded-[10px] bg-[#dcedf6] dark:bg-[#20455a] flex items-center justify-center flex-shrink-0 text-[#2582b7] dark:text-[#4cb5f5]">
-                  <DocumentIcon className="w-[18px] h-[18px]" strokeWidth={2.5} />
-                </div>
-                <div>
-                  <h3 className="text-[13px] font-bold text-[var(--text-primary)] leading-tight mb-0.5">Add Doc</h3>
-                  <p className="text-[12px] text-[var(--text-muted)] tracking-wide">Take notes or create detailed documents</p>
-                </div>
-              </div>
-
-              {/* Start SyncUp */}
-              <div className="flex items-center gap-4 py-3 px-4 rounded-[14px] bg-[#f4fbf7] dark:bg-[#1b3425] hover:shadow-sm border border-transparent transition-all cursor-pointer">
-                <div className="w-8 h-8 rounded-[10px] bg-[#d7f1df] dark:bg-[#215135] flex items-center justify-center flex-shrink-0 text-[#17964b] dark:text-[#38c973]">
-                  <VideoCameraIcon className="w-[18px] h-[18px]" strokeWidth={2.5} />
-                </div>
-                <div>
-                  <h3 className="text-[13px] font-bold text-[var(--text-primary)] leading-tight mb-0.5">Start SyncUp</h3>
-                  <p className="text-[12px] text-[var(--text-muted)] tracking-wide">Jump on a voice call or video call</p>
-                </div>
+        {/* Messages area */}
+        <div className="flex-1 overflow-y-auto px-0 py-0 space-y-0 ck-scrollbar" id="messages-container">
+          {!canAccessChannel ? (
+            <div className="flex items-center justify-center h-full px-6 text-center">
+              <div>
+                <h2 className="text-[18px] font-bold text-[var(--text-primary)] mb-1.5">Private channel</h2>
+                <p className="text-[13px] text-[var(--text-secondary)] max-w-sm">
+                  You do not have access to this channel.
+                </p>
               </div>
             </div>
+          ) : loading ? (
+            <div className="flex items-center justify-center h-full">
+              <div className="flex flex-col items-center gap-3 text-gray-600">
+                <div className="w-8 h-8 border-2 border-indigo-500/30 border-t-indigo-500 rounded-full animate-spin" />
+                <span className="text-[13px]">Loading messages…</span>
+              </div>
+            </div>
+          ) : messages.length === 0 ? (
+            /* Empty state */
+            <div className="flex flex-col items-center justify-center h-full gap-5 px-6 text-center">
+              <div>
+                <h2 className="text-[18px] font-bold text-[var(--text-primary)] mb-1.5">Chat in #{channelName}</h2>
+                <p className="text-[13px] text-[var(--text-secondary)] max-w-sm leading-relaxed">
+                  Collaborate seamlessly across tasks and conversations. Start chatting with your team or connect tasks to stay on top of your work.
+                </p>
+              </div>
 
-            {/* Messages Feed */}
-            <div className="w-full mt-10 space-y-5">
-              {messages.map((msg, i) => {
-                 const isMe = msg.sender?._id === userRef.current?._id || msg.sender?._id === userRef.current?.id;
-                 const senderName = msg.sender?.fullName || msg.sender?.firstName || 'Unknown';
-                 const initial = senderName.charAt(0).toUpperCase();
-                 const timeString = new Date(msg.createdAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+              {/* Action Buttons */}
+              <div className="flex flex-col gap-2 w-full max-w-md mt-2">
+                <button
+                  onClick={() => {
+                    setMembersOpen(true);
+                    setTimeout(() => memberSearchRef.current?.focus(), 0);
+                  }}
+                  className="w-full flex items-center justify-center gap-2 py-2 rounded-lg border border-[var(--border-default)] text-[13px] font-medium text-[var(--text-primary)] hover:bg-[var(--bg-surface-2)] transition-colors"
+                >
+                  <PlusIcon className="w-4 h-4 text-[var(--text-secondary)]" />
+                  Add People
+                </button>
+                <button className="w-full flex items-center justify-center gap-2 py-2 rounded-lg border border-[var(--border-default)] text-[13px] font-medium text-[var(--text-primary)] hover:bg-[var(--bg-surface-2)] transition-colors">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M5.042 15.165a2.528 2.528 0 0 1-2.52 2.523A2.528 2.528 0 0 1 0 15.165a2.527 2.527 0 0 1 2.522-2.52h2.52v2.52zM6.313 15.165a2.527 2.527 0 0 1 2.521-2.52 2.527 2.527 0 0 1 2.521 2.52v6.313A2.528 2.528 0 0 1 8.834 24a2.528 2.528 0 0 1-2.521-2.522v-6.313zM8.834 5.042a2.528 2.528 0 0 1-2.521-2.52A2.528 2.528 0 0 1 8.834 0a2.528 2.528 0 0 1 2.521 2.522v2.52H8.834zM8.834 6.313a2.528 2.528 0 0 1 2.521 2.521 2.528 2.528 0 0 1-2.521 2.521H2.522A2.528 2.528 0 0 1 0 8.834a2.528 2.528 0 0 1 2.522-2.521h6.312zM18.956 8.834a2.528 2.528 0 0 1 2.522-2.521A2.528 2.528 0 0 1 24 8.834a2.528 2.528 0 0 1-2.522 2.521h-2.522V8.834zM17.688 8.834a2.528 2.528 0 0 1-2.523 2.521 2.527 2.527 0 0 1-2.52-2.521V2.522A2.527 2.527 0 0 1 15.165 0a2.528 2.528 0 0 1 2.523 2.522v6.312zM15.165 18.956a2.528 2.528 0 0 1 2.523 2.522A2.528 2.528 0 0 1 15.165 24a2.527 2.527 0 0 1-2.52-2.522v-2.522h2.52zM15.165 17.688a2.527 2.527 0 0 1-2.52-2.523 2.526 2.526 0 0 1 2.52-2.52h6.313A2.527 2.527 0 0 1 24 15.165a2.528 2.528 0 0 1-2.522 2.523h-6.313z" fill="#E01E5A" />
+                  </svg>
+                  Import from Slack
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="py-4">
+              {messageGroups.map((group, gi) => {
+                const firstMsg = group.messages[0];
+                const prevGroupLastMsg =
+                  gi > 0
+                    ? messageGroups[gi - 1].messages[messageGroups[gi - 1].messages.length - 1]
+                    : undefined;
+                const showDiv = shouldShowDivider(prevGroupLastMsg, firstMsg);
+                const senderName = group.sender
+                  ? `${group.sender.firstName} ${group.sender.lastName}`
+                  : "Unknown";
 
-                 return (
-                    <div key={msg._id || i} className={`w-full flex gap-3 ${isMe ? 'flex-row-reverse' : 'flex-row'}`}>
-                       <div className={`w-8 h-8 rounded-[10px] flex items-center justify-center flex-shrink-0 text-[12px] font-bold text-white shadow-sm border border-[var(--border-subtle)] ${isMe ? 'bg-gradient-to-br from-blue-500 to-indigo-600' : 'bg-[var(--bg-surface-2)] text-[var(--text-secondary)]'}`}>
-                          {initial}
-                       </div>
-                       <div className={`flex flex-col max-w-[85%] ${isMe ? 'items-end' : 'items-start'}`}>
-                          <div className="flex items-baseline gap-2 mb-1">
-                             <span className="text-[12.5px] font-bold text-[var(--text-primary)] tracking-tight">{isMe ? 'Me' : senderName}</span>
-                             <span className="text-[10px] font-medium text-[var(--text-muted)]">{timeString}</span>
+                return (
+                  <div key={gi}>
+                    {showDiv && <DateDivider label={formatDateDivider(firstMsg.createdAt)} />}
+
+                    {/* Message group */}
+                    <div className="flex gap-3 px-5 py-2 group hover:bg-[var(--bg-surface-2)] transition-colors">
+                      <div className="flex-shrink-0 pt-0.5">
+                        {group.isMe ? (
+                          <div className={`w-8 h-8 rounded-full ${avatarColor("Admin User")} flex items-center justify-center text-[11px] font-semibold text-white shadow-sm`}>
+                            {(currentUser?.firstName?.[0] ?? "A") + (currentUser?.lastName?.[0] ?? "U")}
                           </div>
-                          <div className={`px-3.5 py-2.5 rounded-[14px] text-[13.5px] leading-relaxed text-[var(--text-primary)] shadow-sm ${isMe ? 'bg-[#e3f0ff] dark:bg-[#1e3a5f] rounded-tr-sm border-transparent' : 'bg-[var(--bg-surface-2)] rounded-tl-sm border border-[var(--border-subtle)]'}`}>
-                             {msg.text}
-                          </div>
-                       </div>
+                        ) : (
+                          <Avatar name={senderName} />
+                        )}
+                      </div>
+
+                      {/* Content */}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-baseline gap-2 mb-0.5">
+                          <span className={`text-[14px] font-bold ${group.isMe ? "text-[var(--ck-blue)]" : "text-[var(--text-primary)]"}`}>
+                            {group.isMe ? "You" : senderName}
+                          </span>
+                          <span className="text-[11px] text-[var(--text-tertiary)] group-hover:text-[var(--text-secondary)] transition-colors">
+                            {formatTime(firstMsg.createdAt)}
+                          </span>
+                        </div>
+                        <div className="space-y-0.5">
+                          {group.messages.map((msg, mi) => (
+                            <p
+                              key={mi}
+                              className={`text-[14px] leading-relaxed break-words ${msg.local ? "opacity-60" : "text-[var(--text-primary)]"}`}
+                              dangerouslySetInnerHTML={{
+                                __html: msg.text.replace(
+                                  /@(\w+)/g,
+                                  '<span class="text-[var(--ck-blue)] font-medium bg-[var(--ck-blue)]/10 px-1 rounded">@$1</span>'
+                                ),
+                              }}
+                            />
+                          ))}
+                        </div>
+                      </div>
                     </div>
-                 );
+                  </div>
+                );
               })}
-              <div ref={messagesEndRef} />
+              <div ref={messagesEndRef} className="h-4" />
+            </div>
+          )}
+        </div>
+
+        {/* Message composer */}
+        <div className="flex-none px-6 pb-6 pt-2">
+          {canAccessChannel && !canMessageInChannel && !hideJoinPrompt && (
+            <div className="mb-2 flex items-center justify-between rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-3 py-2">
+              <p className="text-[12px] text-[var(--text-secondary)]">This channel is public. Join it to post messages.</p>
+              <button
+                onClick={handleJoinChannel}
+                disabled={isJoiningChannel}
+                className="px-3 py-1 rounded-md text-[12px] font-semibold bg-[var(--ck-blue)] text-white hover:opacity-90 transition-opacity"
+              >
+                {isJoiningChannel ? "Joining..." : "Join"}
+              </button>
+            </div>
+          )}
+
+          <div className="relative">
+            <MentionDropdown
+              members={members}
+              query={mentionQuery}
+              onSelect={handleMentionSelect}
+              visible={mentionVisible}
+            />
+
+            <div className="relative rounded-xl border border-[var(--border-default)] bg-[var(--bg-canvas)] transition-all shadow-sm">
+              {/* Textarea */}
+              <div className="px-3 pt-3 pb-2">
+                <textarea
+                  ref={textareaRef}
+                  value={newMessage}
+                  onChange={handleInput}
+                  onKeyDown={handleKeyDown}
+                  autoFocus
+                  placeholder={`Write to ${channelName}, press 'space' for AI, '/' for commands`}
+                  className="w-full bg-transparent border-gray-300 outline-none text-[13px] placeholder-[var(--text-tertiary)] resize-none min-h-[24px] max-h-[160px] leading-relaxed"
+                  rows={1}
+                  disabled={!canAccessChannel || !canMessageInChannel}
+                />
+              </div>
+
+              {/* Toolbar */}
+              <div className="flex items-center justify-between px-2 pb-2 mt-1">
+                <div className="flex items-center gap-1">
+                  <ToolBtn icon={<PlusIcon className="w-4 h-4" />} title="Add" />
+
+                  <button className="flex items-center gap-1.5 px-2 py-1.5 rounded-md hover:bg-[var(--bg-surface-2)] text-[12px] font-medium text-[var(--text-secondary)] transition-colors">
+                    Message <ChevronRightIcon className="w-3 h-3 rotate-90" />
+                  </button>
+
+                  <div className="w-px h-4 bg-[var(--border-subtle)] mx-1" />
+
+                  <ToolBtn
+                    icon={<span className="font-bold text-[14px]">@</span>}
+                    title="Mention"
+                    onClick={() => {
+                      setNewMessage((m) => m + "@");
+                      setMentionQuery("");
+                      setMentionVisible(true);
+                      textareaRef.current?.focus();
+                    }}
+                  />
+                  <ToolBtn icon={<PaperClipIcon className="w-4 h-4" />} title="File" />
+                  <ToolBtn icon={<FaceSmileIcon className="w-4 h-4" />} title="Emoji" />
+                  <ToolBtn icon={<span className="font-bold text-[13px]">/</span>} title="Commands" />
+                </div>
+
+                {/* Send button */}
+                <button
+                  onClick={handleSendMessage}
+                  disabled={!newMessage.trim() || !canAccessChannel || !canMessageInChannel}
+                  className="flex items-center justify-center w-8 h-8 rounded-md text-[var(--text-tertiary)] hover:bg-[var(--bg-surface-2)] hover:text-[var(--text-primary)] transition-all disabled:opacity-30 disabled:cursor-not-allowed"
+                  title="Send message"
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                    <line x1="22" y1="2" x2="11" y2="13" />
+                    <polygon points="22 2 15 22 11 13 2 9 22 2" />
+                  </svg>
+                </button>
+              </div>
             </div>
           </div>
         </div>
-
-        {/* Bottom Input Fixed Area */}
-        <div className="flex-none px-6 pb-6 pt-2 mx-auto w-full max-w-[850px] flex justify-center sticky bottom-0 z-20">
-            <div className="relative w-full rounded-[14px] border-[1.5px] border-[var(--border-subtle)] bg-[var(--bg-canvas)] flex flex-col pt-0 group focus-within:ring-1 focus-within:border-[var(--ck-blue)] focus-within:ring-[var(--ck-blue)] transition-all min-h-[90px] shadow-sm">
-               
-               {/* Floating Warning Banner */}
-               <div className="absolute -top-[48px] left-0 right-0 h-[40px] bg-[#2a2b2f] dark:bg-[#18191c] border border-transparent dark:border-[var(--border-subtle)] rounded-[10px] shadow-md flex items-center justify-between px-3 z-10">
-                 <div className="flex items-center gap-2">
-                   <span className="text-[16px] leading-none mb-0.5">👋</span>
-                   <span className="text-[13px] font-medium text-white tracking-wide">
-                      Send a message <span className="text-gray-400 font-normal">to #{channelName} to get the conversation started!</span>
-                   </span>
-                 </div>
-                 <button className="text-[11.5px] font-semibold text-gray-400 hover:text-white px-2.5 py-1.5 rounded-md hover:bg-[#3f4045] transition-colors">Dismiss</button>
-               </div>
-
-               {/* Editor area */}
-               <div className="px-4 py-3 pb-2 flex-1 relative">
-                 <textarea 
-                   value={newMessage}
-                   onChange={e => setNewMessage(e.target.value)}
-                   onKeyDown={e => {
-                      if (e.key === 'Enter' && !e.shiftKey) {
-                         e.preventDefault();
-                         handleSendMessage();
-                      }
-                   }}
-                   autoFocus
-                   placeholder={`Write to ${channelName}, press 'space' for AI, '/' for commands`}
-                   className="w-full bg-transparent border-none outline-none text-[14px] text-[var(--text-primary)] placeholder-[var(--text-tertiary)] resize-none min-h-[22px] overflow-hidden"
-                   rows={1}
-                 />
-                 <div className="absolute top-2 right-4 flex gap-1 invisible group-hover:visible transition-opacity opacity-0 group-hover:opacity-100"></div>
-               </div>
-
-               {/* Formatting Bar */}
-               <div className="flex items-center justify-between px-2.5 pb-2 border-t border-transparent transition-colors">
-                  <div className="flex items-center gap-0.5">
-                     <button className="w-8 h-8 flex items-center justify-center rounded-md hover:bg-[var(--bg-surface-2)] text-[var(--text-muted)] hover:text-[var(--text-secondary)] transition-colors">
-                       <PlusIcon className="w-4 h-4" strokeWidth={2.5} />
-                     </button>
-                     <button className="h-7 px-2.5 flex items-center gap-1.5 rounded-[5px] hover:bg-[#e4e4e7] dark:hover:bg-[#343438] text-[12.5px] font-medium text-[var(--text-primary)] transition-colors border border-[var(--border-subtle)] bg-[#f4f4f5] dark:bg-[#27272a] shadow-sm mx-1">
-                       Message <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="6 9 12 15 18 9"/></svg>
-                     </button>
-                     
-                     <div className="w-px h-4 bg-[var(--border-subtle)] mx-1"></div>
-
-                     {/* Formatting tools */}
-                     <button className="w-8 h-8 flex items-center justify-center rounded-md hover:bg-[var(--bg-surface-2)] text-[var(--text-muted)] hover:text-[var(--text-secondary)] transition-colors"><span className="text-pink-500 font-bold text-[14px]">#</span></button>
-                     <button className="w-8 h-8 flex items-center justify-center rounded-md hover:bg-[var(--bg-surface-2)] text-[var(--text-muted)] hover:text-[var(--text-secondary)] transition-colors"><span className="text-purple-500 font-bold text-[15px]">@</span></button>
-                     <button className="w-8 h-8 flex items-center justify-center rounded-md hover:bg-[var(--bg-surface-2)] text-[var(--text-muted)] hover:text-[var(--text-secondary)] transition-colors"><PaperClipIcon className="w-4 h-4" strokeWidth={2.5} /></button>
-                     <button className="w-8 h-8 flex items-center justify-center rounded-md hover:bg-[var(--bg-surface-2)] text-[var(--text-muted)] hover:text-[var(--text-secondary)] transition-colors"><FaceSmileIcon className="w-[18px] h-[18px]" strokeWidth={2} /></button>
-                     <button className="w-8 h-8 flex items-center justify-center rounded-md hover:bg-[var(--bg-surface-2)] text-[var(--text-muted)] hover:text-[var(--text-secondary)] transition-colors text-[16px] font-bold">@</button>
-                  </div>
-
-                  <button onClick={handleSendMessage} className="w-8 h-8 flex items-center justify-center rounded-md hover:bg-[var(--bg-surface-2)] text-[var(--text-muted)] transition-colors" title="Send message">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
-                  </button>
-               </div>
-            </div>
-        </div>
       </div>
+
+      {/* ── FOLLOWERS PANEL ── */}
+      {membersOpen && (
+        <aside className="w-[300px] flex-shrink-0 border-l border-[var(--border-subtle)] bg-[var(--bg-canvas)] flex flex-col shadow-[-4px_0_24px_rgba(0,0,0,0.02)] z-20">
+          <div className="flex items-center justify-between px-4 py-3 pb-2 border-b border-[var(--border-subtle)]">
+            <span className="text-[14px] font-semibold text-[var(--text-primary)]">Followers</span>
+            <button onClick={() => setMembersOpen(false)} className="w-6 h-6 flex items-center justify-center rounded-md bg-[var(--bg-surface-2)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M18 6L6 18M6 6l12 12" /></svg>
+            </button>
+          </div>
+
+          <div className="flex items-center gap-4 px-4 pt-2 border-b border-[var(--border-subtle)]">
+            <button
+              onClick={() => setActivePeopleTab("followers")}
+              className={`pb-2 text-[13px] transition-colors border-b-2 ${activePeopleTab === "followers"
+                ? "font-semibold text-[var(--text-primary)] border-[var(--text-primary)]"
+                : "font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)] border-transparent"
+                }`}
+            >
+              Followers <span className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-[var(--bg-surface-3)] text-[10px] ml-1">{canMessageInChannel ? members.length : 0}</span>
+            </button>
+            <button
+              onClick={() => setActivePeopleTab("access")}
+              className={`pb-2 text-[13px] transition-colors border-b-2 ${activePeopleTab === "access"
+                ? "font-semibold text-[var(--text-primary)] border-[var(--text-primary)]"
+                : "font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)] border-transparent"
+                }`}
+            >
+              Access <span className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-[var(--bg-surface-2)] text-[10px] ml-1">{accessMembers.length}</span>
+            </button>
+          </div>
+
+          {activePeopleTab === "followers" ? (
+            <>
+              <div className="flex-1 overflow-y-auto ck-scrollbar py-2 px-1 space-y-0.5">
+                {!canMessageInChannel ? (
+                  <div className="px-3 py-3 text-[12px] text-[var(--text-tertiary)]">
+                    Join this channel to view all existing members.
+                  </div>
+                ) : (
+                  <>
+                    {canManageMembers && (
+                      <div className="pb-2 border-b border-[var(--border-subtle)]">
+                        <div className="px-3">
+                          <div className="relative flex items-center">
+                            <svg className="absolute left-3 w-4 h-4 text-[var(--text-tertiary)]" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8" /><path d="M21 21l-4.35-4.35" /></svg>
+                            <input
+                              ref={memberSearchRef}
+                              type="text"
+                              placeholder="Search people or invite by email"
+                              value={addMemberQuery}
+                              onChange={(e) => setAddMemberQuery(e.target.value)}
+                              className="w-full pl-9 pr-3 py-1.5 rounded-lg border border-[var(--border-default)] text-[13px] bg-transparent focus:border-[var(--ck-blue)] focus:ring-1 focus:ring-[var(--ck-blue-hover)] outline-none transition-all placeholder-[var(--text-tertiary)]"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {canManageMembers && addMemberQuery.trim() && (
+                      <>
+                        <p className="text-[10px] font-semibold uppercase tracking-widest text-[var(--text-tertiary)] px-3 pt-1 pb-1">
+                          SEARCH RESULTS
+                        </p>
+                        {filteredAddableUsers.map((user) => (
+                          <button
+                            key={`add-${user._id}`}
+                            onClick={() => handleAddMember(user)}
+                            className="w-full flex items-center justify-between px-3 py-2 rounded-lg hover:bg-[var(--bg-surface-2)] transition-colors text-left group"
+                          >
+                            <div className="flex items-center gap-3 min-w-0">
+                              <Avatar name={`${user.firstName} ${user.lastName}`} size="sm" />
+                              <div className="min-w-0">
+                                <p className="text-[13px] font-medium text-[var(--text-primary)] truncate">
+                                  {user.firstName} {user.lastName}
+                                </p>
+                                {user.email && (
+                                  <p className="text-[11px] text-[var(--text-tertiary)] truncate">{user.email}</p>
+                                )}
+                              </div>
+                            </div>
+                            <div className="px-2 py-1 rounded-md bg-[var(--bg-surface-3)] text-[11px] font-medium text-[var(--text-secondary)] opacity-0 group-hover:opacity-100 group-hover:bg-[var(--ck-blue)] group-hover:text-white transition-all">
+                              Add
+                            </div>
+                          </button>
+                        ))}
+                        {filteredAddableUsers.length === 0 && (
+                          <div className="px-3 py-2 text-[12px] text-[var(--text-tertiary)]">
+                            No users found.
+                          </div>
+                        )}
+                        <div className="mx-2 my-1 h-px bg-[var(--border-subtle)]" />
+                      </>
+                    )}
+
+                    <p className="text-[10px] font-semibold uppercase tracking-widest text-[var(--text-tertiary)] px-3 pt-1 pb-1">
+                      FOLLOWERS
+                    </p>
+
+                    {!channelConfig?.isPrivate && (
+                      <p className="px-3 pb-1 text-[12px] font-semibold text-[var(--text-secondary)]">
+                        Everyone !!
+                      </p>
+                    )}
+
+                    {canManageMembers && (
+                      <button
+                        onClick={() => memberSearchRef.current?.focus()}
+                        className="w-full flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-[var(--bg-surface-2)] transition-colors text-left group"
+                      >
+                        <div className="w-7 h-7 rounded-full bg-[var(--bg-surface-3)] text-[var(--text-secondary)] border border-dashed border-[var(--border-hover)] flex items-center justify-center group-hover:border-[var(--text-secondary)] transition-colors">
+                          <PlusIcon className="w-4 h-4" />
+                        </div>
+                        <span className="text-[13px] font-medium text-[var(--text-primary)]">Add People</span>
+                      </button>
+                    )}
+
+                    {members.map((m) => (
+                      <div
+                        key={m._id}
+                        className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-[var(--bg-surface-2)] transition-colors cursor-pointer group"
+                      >
+                        <div className="relative">
+                          <Avatar name={`${m.firstName} ${m.lastName}`} size="sm" />
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-[13px] font-medium text-[var(--text-primary)] truncate">
+                            {m.firstName} {m.lastName}
+                          </p>
+                        </div>
+                      </div>
+                    ))}
+                  </>
+                )}
+              </div>
+            </>
+          ) : (
+            <div className="flex-1 overflow-y-auto ck-scrollbar py-2 px-1 space-y-0.5">
+              <p className="text-[10px] font-semibold uppercase tracking-widest text-[var(--text-tertiary)] px-3 pt-1 pb-1">
+                CAN ADD MEMBERS
+              </p>
+              {accessMembers.map((user) => (
+                <div
+                  key={`access-${user._id}`}
+                  className="flex items-center justify-between gap-3 px-3 py-2 rounded-lg hover:bg-[var(--bg-surface-2)] transition-colors"
+                >
+                  <div className="flex items-center gap-3 min-w-0">
+                    <Avatar name={`${user.firstName} ${user.lastName}`} size="sm" />
+                    <div className="min-w-0">
+                      <p className="text-[13px] font-medium text-[var(--text-primary)] truncate">
+                        {user.firstName} {user.lastName}
+                      </p>
+                      {user.email && (
+                        <p className="text-[11px] text-[var(--text-tertiary)] truncate">{user.email}</p>
+                      )}
+                    </div>
+                  </div>
+                  <span className="px-2 py-0.5 rounded-md text-[10px] font-semibold bg-[var(--bg-surface-3)] text-[var(--text-secondary)]">
+                    {isAdmin ? "Admin" : "Member"}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </aside>
+      )}
+
+      {/* Toasts */}
+      <ToastContainer toasts={toasts} remove={removeToast} />
     </div>
+  );
+}
+
+/* ─── Toolbar button ─────────────────────────────────────────── */
+function ToolBtn({ icon, title, onClick }: { icon: React.ReactNode; title: string; onClick?: () => void }) {
+  return (
+    <button
+      onClick={onClick}
+      title={title}
+      className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-[#1e1f2c] text-gray-500 hover:text-gray-300 transition-colors"
+    >
+      {icon}
+    </button>
   );
 }
