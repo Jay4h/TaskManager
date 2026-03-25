@@ -2,6 +2,7 @@ import express from "express";
 import cors from "cors";
 import helmet from "helmet";
 import rateLimit from "express-rate-limit";
+import path from "path";
 import { CORS_CONFIG } from "./middlewares/cors.js";
 import authRoutes from "./routes/auth.routes.js";
 import tasksRoutes from "./routes/tasks.routes.js";
@@ -29,6 +30,7 @@ export function createApp() {
   // Middleware - CORS and body parser must come first
   app.use(cors(CORS_CONFIG));
   app.use(express.json());
+  app.use('/uploads', express.static(path.resolve(process.cwd(), 'uploads')));
   
   // Database connection middleware for serverless
   app.use(async (_req, _res, next) => {

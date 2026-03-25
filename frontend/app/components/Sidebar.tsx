@@ -381,7 +381,11 @@ export default function Sidebar({ userRole }: SidebarProps) {
   const [usersLoading, setUsersLoading] = useState(false);
 
   const [isMounted, setIsMounted] = useState(false);
-  const currentUserId = (user as (User & { _id?: string; id?: string }) | null)?._id || (user as (User & { _id?: string; id?: string }) | null)?.id || "";
+  const currentUserId =
+    (user as (User & { _id?: string; id?: string; userId?: string }) | null)?._id ||
+    (user as (User & { _id?: string; id?: string; userId?: string }) | null)?.id ||
+    (user as (User & { _id?: string; id?: string; userId?: string }) | null)?.userId ||
+    "";
 
   // Fetch projects
   const isAdmin = userRole === "admin";
@@ -491,12 +495,8 @@ export default function Sidebar({ userRole }: SidebarProps) {
   };
 
   const visibleChannels = useMemo(() => {
-    return channels.filter((chan) => {
-      if (!chan.isPrivate) return true;
-      if (!currentUserId) return false;
-      return (chan.members || []).some((m) => m._id === currentUserId);
-    });
-  }, [channels, currentUserId]);
+    return channels;
+  }, [channels]);
 
   const toggleMember = (u: ChannelMember) => {
     setSelectedMembers((prev) =>
@@ -609,19 +609,20 @@ export default function Sidebar({ userRole }: SidebarProps) {
       {isMounted && channelsOpen && (
         <div className="space-y-0.5 mt-1">
           {visibleChannels.map((chan) => {
-            const isActive = pathname === `/dashboard/channels/${chan.id}`;
-            const isJoined = !!currentUserId && (chan.joinedMemberIds || []).includes(currentUserId);
+            const channelId = ((chan as { id?: string; channelId?: string }).id || (chan as { id?: string; channelId?: string }).channelId || "").toLowerCase();
+            const isActive = pathname === `/dashboard/channels/${channelId}`;
+            const isJoined = !!(chan.joined || (!!currentUserId && (chan.joinedMemberIds || []).includes(currentUserId)));
             const showJoin = !isJoined;
             return (
               <div
-                key={chan.id}
+                key={channelId || chan.name}
                 className={`flex items-center justify-between px-2 py-1.5 rounded-md transition-all duration-150 group ${isActive
                   ? "bg-[var(--accent-light)] text-[var(--accent)]"
                   : "text-[var(--text-secondary)] hover:bg-[var(--bg-surface-2)] hover:text-[var(--text-primary)]"
                   }`}
               >
                 <button
-                  onClick={() => navigateTo(`/dashboard/channels/${chan.id}`)}
+                  onClick={() => navigateTo(`/dashboard/channels/${channelId}`)}
                   className="flex items-center gap-2 overflow-hidden flex-1 min-w-0 text-left"
                 >
                   <div className={`flex-shrink-0 ${isActive ? "text-[var(--accent)]" : "text-[var(--text-muted)] group-hover:text-[var(--text-secondary)]"}`}>
@@ -640,7 +641,7 @@ export default function Sidebar({ userRole }: SidebarProps) {
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
-                      joinChannel(chan.id);
+                      joinChannel(channelId);
                     }}
                     className="ml-2 px-2 py-0.5 rounded text-[10px] font-semibold bg-[var(--bg-surface-3)] text-[var(--text-secondary)] opacity-0 group-hover:opacity-100 hover:bg-[var(--ck-blue)] hover:text-white transition-all"
                     title="Join channel"

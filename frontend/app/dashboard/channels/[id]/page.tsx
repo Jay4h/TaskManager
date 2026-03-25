@@ -13,33 +13,29 @@ import {
   ChevronRightIcon,
 } from "@heroicons/react/24/outline";
 import { io, Socket } from "socket.io-client";
-import { channelsApi } from "../../../../src/api/channels.api";
+import {
+  channelsApi,
+  type Channel,
+  type ChannelAttachment,
+  type ChannelMessage,
+  type ChannelUser,
+} from "../../../../src/api/channels.api";
 
 /* ─── Types ─────────────────────────────────────────────────── */
-interface Member {
-  _id: string;
-  firstName: string;
-  lastName: string;
-  email?: string;
-}
+type Member = ChannelUser;
 
-interface Message {
+interface Message extends Omit<ChannelMessage, "_id" | "channelId" | "createdAt" | "updatedAt" | "mentions" | "attachments"> {
   _id?: string;
   channelId?: string;
   text: string;
   sender: Member | null;
+  mentions?: Member[];
+  attachments?: ChannelAttachment[];
   createdAt: string | Date;
   local?: boolean; // optimistic
 }
 
-interface StoredChannel {
-  id: string;
-  name: string;
-  members?: Member[];
-  isPrivate?: boolean;
-  createdBy?: string;
-  joinedMemberIds?: string[];
-}
+type StoredChannel = Channel;
 
 /* ─── Toast ──────────────────────────────────────────────────── */
 type ToastType = "success" | "error" | "info";
@@ -196,6 +192,20 @@ function shouldShowDivider(prev: Message | undefined, curr: Message) {
   return new Date(prev.createdAt).toDateString() !== new Date(curr.createdAt).toDateString();
 }
 
+function renderMessageText(text: string) {
+  const parts = text.split(/(@[a-zA-Z0-9_]+)/g);
+  return parts.map((part, index) => {
+    if (part.startsWith("@")) {
+      return (
+        <span key={`${part}-${index}`} className="text-[var(--ck-blue)] font-medium bg-[var(--ck-blue)]/10 px-1 rounded mr-0.5">
+          {part}
+        </span>
+      );
+    }
+    return <React.Fragment key={`${part}-${index}`}>{part}</React.Fragment>;
+  });
+}
+
 function DateDivider({ label }: { label: string }) {
   return (
     <div className="flex items-center gap-3 my-4 px-4">
@@ -210,6 +220,7 @@ function DateDivider({ label }: { label: string }) {
 export default function ChannelPage() {
   const params = useParams();
   const id = params.id as string;
+  const normalizedChannelId = decodeURIComponent(id || "").trim().toLowerCase();
   const channelName = id.charAt(0).toUpperCase() + id.slice(1).replace(/-/g, " ");
 
   const [messages, setMessages] = useState<Message[]>([]);
@@ -223,10 +234,14 @@ export default function ChannelPage() {
   const [membersOpen, setMembersOpen] = useState(true);
   const [mentionQuery, setMentionQuery] = useState("");
   const [mentionVisible, setMentionVisible] = useState(false);
+  const [selectedMentionIds, setSelectedMentionIds] = useState<string[]>([]);
+  const [mentionSuggestions, setMentionSuggestions] = useState<Member[]>([]);
   const [loading, setLoading] = useState(true);
-  const [showBanner, setShowBanner] = useState(true);
   const [isJoiningChannel, setIsJoiningChannel] = useState(false);
   const [hideJoinPrompt, setHideJoinPrompt] = useState(false);
+  const [pendingAttachments, setPendingAttachments] = useState<ChannelAttachment[]>([]);
+  const [isUploadingFiles, setIsUploadingFiles] = useState(false);
+  const [emojiPickerOpen, setEmojiPickerOpen] = useState(false);
 
   // Add Member feature state
   const [allUsers, setAllUsers] = useState<Member[]>([]);
@@ -235,7 +250,10 @@ export default function ChannelPage() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const memberSearchRef = useRef<HTMLInputElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const { toasts, add: addToast, remove: removeToast } = useToast();
+
+  const quickEmojis = ["😀", "😂", "😍", "🔥", "👍", "🎉", "✅", "🙏", "👀", "🤝", "❤️", "🚀"];
 
   /* ---------- scroll to bottom ---------- */
   const scrollToBottom = useCallback(() => {
@@ -245,12 +263,16 @@ export default function ChannelPage() {
 
   /* ---------- load user + channel + messages ---------- */
   useEffect(() => {
+    let mounted = true;
     const userStr = localStorage.getItem("user");
+    let localUserId = "";
+
     if (userStr) {
       try {
         const parsed = JSON.parse(userStr) as {
           _id?: string;
           id?: string;
+          userId?: string;
           firstName?: string;
           lastName?: string;
           name?: string;
@@ -259,8 +281,9 @@ export default function ChannelPage() {
         };
 
         const fallbackName = (parsed.name || "").trim().split(/\s+/).filter(Boolean);
+        localUserId = parsed._id || parsed.id || parsed.userId || "me";
         setCurrentUser({
-          _id: parsed._id || parsed.id || "me",
+          _id: localUserId,
           firstName: parsed.firstName || fallbackName[0] || "User",
           lastName: parsed.lastName || fallbackName.slice(1).join(" "),
           email: parsed.email,
@@ -272,12 +295,31 @@ export default function ChannelPage() {
     // Fetch channel details and conditionally load messages only for joined users
     const fetchChannelAndHistory = async () => {
       try {
-        const channel = await channelsApi.getChannel(id);
-        setChannelConfig(channel as unknown as StoredChannel);
-        setMembers((channel.members || []) as Member[]);
+        const channel = await channelsApi.getChannel(normalizedChannelId);
+        if (!mounted) return;
 
-        if ((channel.joinedMemberIds || []).some((memberId) => memberId === (currentUser?._id || ""))) {
-          const history = await channelsApi.getMessages(id);
+        setChannelConfig(channel as StoredChannel);
+        setMembers((channel.joinedMembers || channel.members || []) as Member[]);
+        setMentionSuggestions((channel.joinedMembers || []) as Member[]);
+
+        const isJoined = channel.joined || (channel.joinedMemberIds || []).some((memberId) => memberId === localUserId);
+        const hasPrivateAccess = !channel.isPrivate || (channel.members || []).some((member) => member._id === localUserId);
+
+        if (!isJoined && channel.isPrivate && hasPrivateAccess) {
+          try {
+            const joined = await channelsApi.joinChannel(normalizedChannelId);
+            if (!mounted) return;
+            setChannelConfig(joined as StoredChannel);
+            setMembers((joined.joinedMembers || joined.members || []) as Member[]);
+            setMentionSuggestions((joined.joinedMembers || joined.members || []) as Member[]);
+          } catch {
+            // Best-effort auto join for invited private members.
+          }
+        }
+
+        if (isJoined || (channel.isPrivate && hasPrivateAccess)) {
+          const history = await channelsApi.getMessages(normalizedChannelId);
+          if (!mounted) return;
           setMessages(history as Message[]);
         } else {
           setMessages([]);
@@ -294,6 +336,7 @@ export default function ChannelPage() {
     const fetchAllUsers = async () => {
       try {
         const users = await channelsApi.getUsers();
+        if (!mounted) return;
         setAllUsers(users as Member[]);
       } catch (err) {
         console.error("Failed to fetch users", err);
@@ -310,7 +353,17 @@ export default function ChannelPage() {
       auth: { token },
     });
     setSocket(newSocket);
-    newSocket.emit("join_channel", id);
+    newSocket.emit("join_channel", normalizedChannelId);
+
+    const handlePresenceUpdated = (updatedChannel: StoredChannel) => {
+      if (!updatedChannel || updatedChannel.id?.toLowerCase() !== normalizedChannelId) return;
+
+      setChannelConfig(updatedChannel);
+      const joinedUsers = (updatedChannel.joinedMembers || updatedChannel.members || []) as Member[];
+      setMembers(joinedUsers);
+      setMentionSuggestions(joinedUsers);
+    };
+
     newSocket.on("receive_message", (msg: Message) => {
       setMessages((prev) => {
         // Avoid duplicate if we already added optimistically by local flag
@@ -323,12 +376,17 @@ export default function ChannelPage() {
         return [...prev, msg];
       });
     });
+
+    newSocket.on("channel_presence_updated", handlePresenceUpdated);
+
     return () => {
-      newSocket.emit("leave_channel", id);
+      mounted = false;
+      newSocket.off("channel_presence_updated", handlePresenceUpdated);
+      newSocket.emit("leave_channel", normalizedChannelId);
       newSocket.disconnect();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [id, currentUser?._id]);
+  }, [id, normalizedChannelId]);
 
   /* ---------- send message ---------- */
   const handleSendMessage = () => {
@@ -338,25 +396,39 @@ export default function ChannelPage() {
     }
 
     const text = newMessage.trim();
-    if (!text || !socket || !currentUser) return;
+    const hasAttachments = pendingAttachments.length > 0;
+    if ((!text && !hasAttachments) || !socket || !currentUser) return;
+
+    const mentionIds = selectedMentionIds.filter((mentionId) => {
+      const mentionedUser = mentionSuggestions.find((user) => user._id === mentionId);
+      if (!mentionedUser) return false;
+      return text.toLowerCase().includes(`@${mentionedUser.firstName.toLowerCase()}`);
+    });
 
     // Optimistic message
     const optimistic: Message = {
       text,
       sender: currentUser,
+      attachments: pendingAttachments,
+      mentions: mentionSuggestions.filter((member) => mentionIds.includes(member._id)),
       createdAt: new Date().toISOString(),
       local: true,
     };
     setMessages((prev) => [...prev, optimistic]);
     setNewMessage("");
+    setSelectedMentionIds([]);
+    setPendingAttachments([]);
+    setMentionVisible(false);
     if (textareaRef.current) {
       textareaRef.current.style.height = "auto";
     }
 
     socket.emit("send_message", {
-      channelId: id,
+      channelId: normalizedChannelId,
       text,
       senderId: currentUser._id,
+      mentions: mentionIds,
+      attachments: pendingAttachments,
     });
     addToast("Message sent!", "success", 2000);
   };
@@ -374,7 +446,7 @@ export default function ChannelPage() {
     // @mention detection
     const cursor = ta.selectionStart;
     const before = val.slice(0, cursor);
-    const match = before.match(/@(\w*)$/);
+    const match = before.match(/@([a-zA-Z0-9_]*)$/);
     if (match) {
       setMentionQuery(match[1]);
       setMentionVisible(true);
@@ -387,10 +459,44 @@ export default function ChannelPage() {
     const cursor = textareaRef.current?.selectionStart ?? newMessage.length;
     const before = newMessage.slice(0, cursor);
     const after = newMessage.slice(cursor);
-    const withoutAtQuery = before.replace(/@\w*$/, "");
+    const withoutAtQuery = before.replace(/@[a-zA-Z0-9_]*$/, "");
     const inserted = `@${m.firstName} `;
     setNewMessage(withoutAtQuery + inserted + after);
+    setSelectedMentionIds((prev) => (prev.includes(m._id) ? prev : [...prev, m._id]));
     setMentionVisible(false);
+    setTimeout(() => textareaRef.current?.focus(), 0);
+  };
+
+  const handleFileUpload = async (fileList: FileList | null) => {
+    if (!fileList || fileList.length === 0) return;
+    if (!canMessageInChannel) {
+      addToast("Join this channel to upload files", "info");
+      return;
+    }
+
+    const files = Array.from(fileList);
+    setIsUploadingFiles(true);
+    try {
+      const uploaded = await channelsApi.uploadFiles(normalizedChannelId, files);
+      setPendingAttachments((prev) => [...prev, ...uploaded]);
+      addToast(`${uploaded.length} file${uploaded.length > 1 ? "s" : ""} uploaded`, "success");
+    } catch {
+      addToast("Failed to upload files", "error");
+    } finally {
+      setIsUploadingFiles(false);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
+    }
+  };
+
+  const removePendingAttachment = (index: number) => {
+    setPendingAttachments((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const addEmojiToComposer = (emoji: string) => {
+    setNewMessage((value) => `${value}${emoji}`);
+    setEmojiPickerOpen(false);
     setTimeout(() => textareaRef.current?.focus(), 0);
   };
 
@@ -402,6 +508,22 @@ export default function ChannelPage() {
     }
     if (e.key === "Escape") setMentionVisible(false);
   };
+
+  useEffect(() => {
+    const hasAccess = !channelConfig?.isPrivate || !!channelConfig.members?.some((member) => member._id === currentUser?._id);
+    if (!mentionVisible || !hasAccess) return;
+
+    const timeoutId = setTimeout(async () => {
+      try {
+        const suggestions = await channelsApi.getMentionSuggestions(normalizedChannelId, mentionQuery);
+        setMentionSuggestions(suggestions);
+      } catch {
+        // Keep previous suggestions when mention lookup fails.
+      }
+    }, 150);
+
+    return () => clearTimeout(timeoutId);
+  }, [mentionVisible, mentionQuery, normalizedChannelId, channelConfig, currentUser]);
 
   /* ---------- add member ---------- */
   const handleAddMember = async (user: Member) => {
@@ -417,9 +539,9 @@ export default function ChannelPage() {
     }
 
     try {
-      const updated = await channelsApi.addMember(id, user._id);
+      const updated = await channelsApi.addMember(normalizedChannelId, user._id);
       setChannelConfig(updated as unknown as StoredChannel);
-      setMembers((updated.members || []) as Member[]);
+      setMembers((updated.joinedMembers || updated.members || []) as Member[]);
       addToast(`${user.firstName} ${user.lastName} added to channel`, "success");
       setAddMemberQuery("");
       setTimeout(() => memberSearchRef.current?.focus(), 0);
@@ -441,6 +563,12 @@ export default function ChannelPage() {
     );
   }, [addableUsers, addMemberQuery]);
 
+  useEffect(() => {
+    if (!mentionVisible) {
+      setMentionSuggestions(members);
+    }
+  }, [members, mentionVisible]);
+
   const canAccessChannel = useMemo(() => {
     if (!channelConfig) return true;
     if (!channelConfig.isPrivate) return true;
@@ -451,6 +579,7 @@ export default function ChannelPage() {
   const canMessageInChannel = useMemo(() => {
     if (!canAccessChannel) return false;
     if (!channelConfig) return true;
+    if (channelConfig.joined) return true;
     if (!currentUser?._id) return false;
     return (channelConfig.joinedMemberIds || []).includes(currentUser._id);
   }, [canAccessChannel, channelConfig, currentUser]);
@@ -469,13 +598,14 @@ export default function ChannelPage() {
     setIsJoiningChannel(true);
     setHideJoinPrompt(true);
     try {
-      const joined = await channelsApi.joinChannel(id);
+      const joined = await channelsApi.joinChannel(normalizedChannelId);
       setChannelConfig(joined as unknown as StoredChannel);
-      setMembers(((joined as unknown as StoredChannel).members || []) as Member[]);
-      socket?.emit("join_channel", id);
+      setMembers((joined.joinedMembers || joined.members || []) as Member[]);
+      setMentionSuggestions((joined.joinedMembers || []) as Member[]);
+      socket?.emit("join_channel", normalizedChannelId);
 
       try {
-        const history = await channelsApi.getMessages(id);
+        const history = await channelsApi.getMessages(normalizedChannelId);
         setMessages(history as Message[]);
       } catch {
         setMessages([]);
@@ -607,7 +737,8 @@ export default function ChannelPage() {
                     {showDiv && <DateDivider label={formatDateDivider(firstMsg.createdAt)} />}
 
                     {/* Message group */}
-                    <div className="flex gap-3 px-5 py-2 group hover:bg-[var(--bg-surface-2)] transition-colors">
+                    <div className={`flex px-5 py-1 ${group.isMe ? "justify-end" : "justify-start"}`}>
+                      <div className={`flex gap-3 max-w-[78%] rounded-xl px-3 py-2 transition-colors hover:bg-[var(--bg-surface-2)] ${group.isMe ? "flex-row-reverse" : "flex-row"}`}>
                       <div className="flex-shrink-0 pt-0.5">
                         {group.isMe ? (
                           <div className={`w-8 h-8 rounded-full ${avatarColor("Admin User")} flex items-center justify-center text-[11px] font-semibold text-white shadow-sm`}>
@@ -619,8 +750,8 @@ export default function ChannelPage() {
                       </div>
 
                       {/* Content */}
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-baseline gap-2 mb-0.5">
+                      <div className={`flex-1 min-w-0 ${group.isMe ? "text-right" : "text-left"}`}>
+                        <div className={`flex items-baseline gap-2 mb-0.5 ${group.isMe ? "justify-end" : "justify-start"}`}>
                           <span className={`text-[14px] font-bold ${group.isMe ? "text-[var(--ck-blue)]" : "text-[var(--text-primary)]"}`}>
                             {group.isMe ? "You" : senderName}
                           </span>
@@ -630,19 +761,34 @@ export default function ChannelPage() {
                         </div>
                         <div className="space-y-0.5">
                           {group.messages.map((msg, mi) => (
-                            <p
-                              key={mi}
-                              className={`text-[14px] leading-relaxed break-words ${msg.local ? "opacity-60" : "text-[var(--text-primary)]"}`}
-                              dangerouslySetInnerHTML={{
-                                __html: msg.text.replace(
-                                  /@(\w+)/g,
-                                  '<span class="text-[var(--ck-blue)] font-medium bg-[var(--ck-blue)]/10 px-1 rounded">@$1</span>'
-                                ),
-                              }}
-                            />
+                            <div key={mi} className={`${msg.local ? "opacity-60" : "text-[var(--text-primary)]"}`}>
+                              {msg.text && (
+                                <p className="text-[14px] leading-relaxed break-words">
+                                  {renderMessageText(msg.text)}
+                                </p>
+                              )}
+
+                              {!!msg.attachments?.length && (
+                                <div className={`mt-1 flex flex-wrap gap-2 ${group.isMe ? "justify-end" : "justify-start"}`}>
+                                  {msg.attachments.map((file, fileIndex) => (
+                                    <a
+                                      key={`${file.url}-${fileIndex}`}
+                                      href={file.url}
+                                      target="_blank"
+                                      rel="noreferrer"
+                                      className="inline-flex items-center gap-2 rounded-md border border-[var(--border-default)] bg-[var(--bg-surface)] px-2.5 py-1.5 text-[12px] text-[var(--text-primary)] hover:bg-[var(--bg-surface-2)]"
+                                    >
+                                      <PaperClipIcon className="w-3.5 h-3.5 text-[var(--text-tertiary)]" />
+                                      <span className="max-w-[220px] truncate">{file.fileName}</span>
+                                    </a>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
                           ))}
                         </div>
                       </div>
+                    </div>
                     </div>
                   </div>
                 );
@@ -656,7 +802,11 @@ export default function ChannelPage() {
         <div className="flex-none px-6 pb-6 pt-2">
           {canAccessChannel && !canMessageInChannel && !hideJoinPrompt && (
             <div className="mb-2 flex items-center justify-between rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-3 py-2">
-              <p className="text-[12px] text-[var(--text-secondary)]">This channel is public. Join it to post messages.</p>
+              <p className="text-[12px] text-[var(--text-secondary)]">
+                {channelConfig?.isPrivate
+                  ? "You were added to this private channel. Join to start messaging."
+                  : "This channel is public. Join it to post messages."}
+              </p>
               <button
                 onClick={handleJoinChannel}
                 disabled={isJoiningChannel}
@@ -669,13 +819,41 @@ export default function ChannelPage() {
 
           <div className="relative">
             <MentionDropdown
-              members={members}
+              members={mentionSuggestions}
               query={mentionQuery}
               onSelect={handleMentionSelect}
               visible={mentionVisible}
             />
 
+            <input
+              ref={fileInputRef}
+              type="file"
+              className="hidden"
+              multiple
+              onChange={(e) => void handleFileUpload(e.target.files)}
+            />
+
             <div className="relative rounded-xl border border-[var(--border-default)] bg-[var(--bg-canvas)] transition-all shadow-sm">
+              {!!pendingAttachments.length && (
+                <div className="px-3 pt-3 pb-1 flex flex-wrap gap-2 border-b border-[var(--border-subtle)]">
+                  {pendingAttachments.map((file, index) => (
+                    <div
+                      key={`${file.url}-${index}`}
+                      className="inline-flex items-center gap-2 rounded-md border border-[var(--border-default)] bg-[var(--bg-surface)] px-2 py-1 text-[12px]"
+                    >
+                      <PaperClipIcon className="w-3.5 h-3.5 text-[var(--text-tertiary)]" />
+                      <span className="max-w-[200px] truncate">{file.fileName}</span>
+                      <button
+                        onClick={() => removePendingAttachment(index)}
+                        className="text-[var(--text-tertiary)] hover:text-[var(--text-primary)]"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+
               {/* Textarea */}
               <div className="px-3 pt-3 pb-2">
                 <textarea
@@ -712,15 +890,23 @@ export default function ChannelPage() {
                       textareaRef.current?.focus();
                     }}
                   />
-                  <ToolBtn icon={<PaperClipIcon className="w-4 h-4" />} title="File" />
-                  <ToolBtn icon={<FaceSmileIcon className="w-4 h-4" />} title="Emoji" />
+                  <ToolBtn
+                    icon={<PaperClipIcon className="w-4 h-4" />}
+                    title="File"
+                    onClick={() => fileInputRef.current?.click()}
+                  />
+                  <ToolBtn
+                    icon={<FaceSmileIcon className="w-4 h-4" />}
+                    title="Emoji"
+                    onClick={() => setEmojiPickerOpen((open) => !open)}
+                  />
                   <ToolBtn icon={<span className="font-bold text-[13px]">/</span>} title="Commands" />
                 </div>
 
                 {/* Send button */}
                 <button
                   onClick={handleSendMessage}
-                  disabled={!newMessage.trim() || !canAccessChannel || !canMessageInChannel}
+                  disabled={(!newMessage.trim() && pendingAttachments.length === 0) || !canAccessChannel || !canMessageInChannel || isUploadingFiles}
                   className="flex items-center justify-center w-8 h-8 rounded-md text-[var(--text-tertiary)] hover:bg-[var(--bg-surface-2)] hover:text-[var(--text-primary)] transition-all disabled:opacity-30 disabled:cursor-not-allowed"
                   title="Send message"
                 >
@@ -730,6 +916,23 @@ export default function ChannelPage() {
                   </svg>
                 </button>
               </div>
+
+              {emojiPickerOpen && (
+                <div className="absolute bottom-[48px] right-2 z-30 w-[260px] rounded-lg border border-[var(--border-default)] bg-[var(--bg-canvas)] shadow-xl p-2">
+                  <p className="text-[11px] text-[var(--text-tertiary)] px-1 pb-1">Pick an emoji</p>
+                  <div className="grid grid-cols-6 gap-1">
+                    {quickEmojis.map((emoji) => (
+                      <button
+                        key={emoji}
+                        onClick={() => addEmojiToComposer(emoji)}
+                        className="h-8 rounded-md hover:bg-[var(--bg-surface-2)] text-[18px]"
+                      >
+                        {emoji}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>
