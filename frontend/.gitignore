@@ -41,4 +41,4 @@ yarn-error.log*
 next-env.d.ts
 
 # ecosystem.config.ts
-/ecosystem.config.ts
+ecosystem.config.js
