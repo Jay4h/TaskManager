@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import { Inter, Crimson_Pro } from "next/font/google";
 import "./global.css";
 import ReactQueryProvider from "./providers/ReactQueryProvider";
+import { SocketProvider } from "./providers/SocketProvider";
+import { GlobalIncomingCallBanner } from "./components/videocalls/IncomingCallBanner";
 
 const inter = Inter({
   variable: "--font-inter",
@@ -27,12 +29,18 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className="scroll-smooth" suppressHydrationWarning>
+    <html lang="en" className="scroll-smooth" data-scroll-behavior="smooth" suppressHydrationWarning>
       <body
         suppressHydrationWarning
         className={`${inter.variable} ${crimsonPro.variable} font-ui antialiased`}
       >
-        <ReactQueryProvider>{children}</ReactQueryProvider>
+        <ReactQueryProvider>
+          <SocketProvider>
+            {children}
+            {/* Global incoming call notification — visible on every page */}
+            <GlobalIncomingCallBanner />
+          </SocketProvider>
+        </ReactQueryProvider>
       </body>
     </html>
   );
