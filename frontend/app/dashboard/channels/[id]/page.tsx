@@ -21,6 +21,7 @@ import {
   type ChannelUser,
 } from "../../../../src/api/channels.api";
 import { ChannelVideoCall } from "../../../components/videocalls/ChannelVideoCall";
+import { ChannelVoiceCall } from "../../../components/videocalls/ChannelVoiceCall";
 import { ChannelCallPrompt } from "../../../components/videocalls/ChannelCallPrompt";
 
 /* ─── Types ─────────────────────────────────────────────────── */
@@ -267,6 +268,7 @@ export default function ChannelPage() {
   const [callType, setCallType] = useState<'voice' | 'video'>('video');
   const [callStarted, setCallStarted] = useState(false);
   const [callData, setCallData] = useState<{ token: string; url: string; roomName: string; callId?: string } | null>(null);
+  const [isCallMinimized, setIsCallMinimized] = useState(false);
   // In-channel call notification: someone started a call while user is on this page
   const [incomingCallNotice, setIncomingCallNotice] = useState<{ initiatorName: string } | null>(null);
 
@@ -277,6 +279,53 @@ export default function ChannelPage() {
       setShowVideoCall(true);
     }
   }, [searchParams]);
+
+  // Restore active call from localStorage on mount
+  useEffect(() => {
+    const activeCall = localStorage.getItem('activeCall');
+    if (activeCall) {
+      try {
+        const callState = JSON.parse(activeCall);
+        console.log('📞 Restoring active call from localStorage:', callState);
+        
+        // Only restore if the call is for this channel
+        if (callState.channelId === normalizedChannelId) {
+          setCallType(callState.callType || 'video');
+          setCallData({
+            token: callState.token,
+            url: callState.url,
+            roomName: callState.roomName,
+            callId: callState.callId,
+          });
+          setCallStarted(true);
+          setShowVideoCall(true);
+          console.log('✅ Call restored, showing call UI');
+        }
+      } catch (err) {
+        console.error('Error restoring call state:', err);
+      }
+    }
+  }, [normalizedChannelId]);
+
+  // Clear call state when channel changes (unless it's from the same channel)
+  useEffect(() => {
+    const activeCall = localStorage.getItem('activeCall');
+    if (activeCall) {
+      try {
+        const callState = JSON.parse(activeCall);
+        // If the active call is from a different channel, close it
+        if (callState.channelId !== normalizedChannelId) {
+          console.log('📞 Channel changed - closing previous channel call');
+          setShowVideoCall(false);
+          setCallStarted(false);
+          setCallData(null);
+          setIsCallMinimized(false);
+        }
+      } catch (err) {
+        console.error('Error checking call channel:', err);
+      }
+    }
+  }, [normalizedChannelId]);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -802,25 +851,54 @@ export default function ChannelPage() {
           </div>
         )}
 
-        {/* Video call section */}
-        {showVideoCall ? (
-          <div className="relative flex-1 flex flex-col bg-[var(--bg-canvas)] overflow-hidden">
+        {/* Video call section - only fullscreen, minimized call is shown separately below */}
+        {showVideoCall && !isCallMinimized ? (
+          <div className={`relative flex-1 flex flex-col bg-[var(--bg-canvas)] overflow-hidden`}>
             {callStarted && callData ? (
-              <div className="flex-1 overflow-hidden relative">
-                <ChannelVideoCall
-                  channelId={normalizedChannelId}
-                  channelName={channelName}
-                  callType={callType}
-                  onCallEnd={() => {
-                    setShowVideoCall(false);
-                    setCallStarted(false);
-                    setCallData(null);
-                  }}
-                  token={callData.token}
-                  url={callData.url}
-                  roomName={callData.roomName}
-                  callId={callData.callId}
-                />
+              <div className={`flex-1 overflow-hidden relative flex flex-col`}>
+                {/* Minimize button for voice calls only */}
+                {callType === 'voice' && (
+                  <div className="absolute top-2 right-2 z-50 flex gap-2">
+                    <button
+                      onClick={() => setIsCallMinimized(true)}
+                      className="p-2 bg-black/40 hover:bg-black/60 rounded-lg transition-colors"
+                      title="Minimize call"
+                    >
+                      <svg className="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 24 24">
+                        <path d="M19 13H5v-2h14v2z"/>
+                      </svg>
+                    </button>
+                  </div>
+                )}
+                {callType === 'video' ? (
+                  <ChannelVideoCall
+                    channelId={normalizedChannelId}
+                    channelName={channelName}
+                    onCallEnd={() => {
+                      setShowVideoCall(false);
+                      setCallStarted(false);
+                      setCallData(null);
+                    }}
+                    token={callData.token}
+                    url={callData.url}
+                    roomName={callData.roomName}
+                    callId={callData.callId}
+                  />
+                ) : (
+                  <ChannelVoiceCall
+                    channelId={normalizedChannelId}
+                    channelName={channelName}
+                    onCallEnd={() => {
+                      setShowVideoCall(false);
+                      setCallStarted(false);
+                      setCallData(null);
+                    }}
+                    token={callData.token}
+                    url={callData.url}
+                    roomName={callData.roomName}
+                    callId={callData.callId}
+                  />
+                )}
               </div>
             ) : (
               <div className="flex-1 flex items-center justify-center p-4">
@@ -856,8 +934,57 @@ export default function ChannelPage() {
           </div>
         ) : null}
 
+        {/* Minimized call widget - floating overlay at bottom-right (voice calls only) */}
+        {showVideoCall && isCallMinimized && callStarted && callData && callType === 'voice' && (
+          <div className="fixed bottom-4 right-4 w-80 h-56 rounded-lg border border-[var(--border-subtle)] shadow-2xl bg-[var(--bg-canvas)] z-50 flex flex-col overflow-hidden">
+            {/* Header */}
+            <div className="flex items-center justify-between px-3 py-2 bg-[var(--bg-surface-2)] border-b border-[var(--border-subtle)]">
+              <span className="text-xs font-semibold text-[var(--text-primary)] truncate">{channelName}</span>
+              <div className="flex gap-1">
+                <button
+                  onClick={() => setIsCallMinimized(false)}
+                  className="p-1 hover:bg-[var(--bg-surface-3)] rounded transition-colors"
+                  title="Maximize"
+                >
+                  <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z"/>
+                  </svg>
+                </button>
+                <button
+                  onClick={() => {
+                    setShowVideoCall(false);
+                    setCallStarted(false);
+                    setCallData(null);
+                    setIsCallMinimized(false);
+                  }}
+                  className="p-1 hover:bg-red-500/20 text-red-500 rounded transition-colors"
+                  title="Close call"
+                >
+                  ✕
+                </button>
+              </div>
+            </div>
+
+            {/* Call content - audio only or video preview */}
+            <div className="flex-1 bg-[#0f0f11] flex items-center justify-center overflow-hidden">
+              {callType === 'voice' ? (
+                <div className="flex flex-col items-center gap-3">
+                  <div className="w-12 h-12 rounded-full bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center animate-pulse">
+                    <svg className="w-6 h-6 text-white" fill="currentColor" viewBox="0 0 24 24">
+                      <path d="M15.5 1h-8C6.12 1 5 2.12 5 3.5v17C5 21.88 6.12 23 7.5 23h8c1.38 0 2.5-1.12 2.5-2.5v-17C18 2.12 16.88 1 15.5 1zm-4 21c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zm4.5-4H7V4h9v14z"/>
+                    </svg>
+                  </div>
+                  <p className="text-xs text-[var(--text-secondary)]">Voice Call</p>
+                </div>
+              ) : (
+                <p className="text-xs text-[var(--text-secondary)]">Video Active</p>
+              )}
+            </div>
+          </div>
+        )}
+
         {/* Messages area */}
-        <div className={`flex-1 overflow-y-auto px-0 py-0 space-y-0 ck-scrollbar ${showVideoCall ? 'hidden' : ''}`} id="messages-container">
+        <div className={`flex-1 overflow-y-auto px-0 py-0 space-y-0 ck-scrollbar ${showVideoCall && !isCallMinimized ? 'hidden' : ''}`} id="messages-container">
           {!canAccessChannel ? (
             <div className="flex items-center justify-center h-full px-6 text-center">
               <div>
@@ -1052,7 +1179,7 @@ export default function ChannelPage() {
         )}
 
         {/* Message composer */}
-        <div className={`flex-none px-6 pb-6 pt-2 ${showVideoCall ? 'hidden' : ''}`}>
+        <div className={`flex-none px-6 pb-6 pt-2 ${showVideoCall && !isCallMinimized ? 'hidden' : ''}`}>
           {canAccessChannel && !canMessageInChannel && !hideJoinPrompt && (
             <div className="mb-2 flex items-center justify-between rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-3 py-2">
               <p className="text-[12px] text-[var(--text-secondary)]">
@@ -1353,7 +1480,7 @@ export default function ChannelPage() {
 
                     {members.map((m) => (
                       <div
-                        key={m._id}
+                        key={`followers-${m._id}`}
                         className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-[var(--bg-surface-2)] transition-colors cursor-pointer group"
                       >
                         <div className="relative">
@@ -1440,7 +1567,7 @@ export default function ChannelPage() {
               <>
                 {members.map((m) => (
                   <div
-                    key={m._id}
+                    key={`mobile-followers-${m._id}`}
                     className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-[var(--bg-surface-2)] transition-colors"
                   >
                     <div className="relative">

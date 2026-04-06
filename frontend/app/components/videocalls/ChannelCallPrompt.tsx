@@ -30,8 +30,27 @@ export function ChannelCallPrompt({
     const [recordingEnabled, setRecordingEnabled] = useState(false);
     const { socket, isConnected } = useSocket();
 
-    // Check for active calls on mount
+    const checkForActiveCall = async () => {
+        try {
+            const callInfo = await videocallsApi.getCallInfo(channelId);
+            console.log('Active call status:', callInfo);
+            setHasActiveCall(callInfo.hasActiveCall);
+            if (callInfo.activeCall?.participants) {
+                const participantNames = callInfo.activeCall.participants.map((p) => `${p.firstName} ${p.lastName}`);
+                console.log('Participants:', participantNames);
+                setActiveParticipants(participantNames);
+            } else {
+                console.log('No participants in active call');
+                setActiveParticipants([]);
+            }
+        } catch (error) {
+            console.error('Error checking for active call:', error);
+        }
+    };
+
+    // Check for active calls on mount and whenever channel changes
     useEffect(() => {
+        console.log('Checking for active call on mount/channel change:', channelId);
         checkForActiveCall();
         const interval = setInterval(checkForActiveCall, 5000); // Poll every 5 seconds
 
@@ -96,24 +115,6 @@ export function ChannelCallPrompt({
             socket.emit('leave_channel', channelId);
         };
     }, [socket, isConnected, channelId]);
-
-    const checkForActiveCall = async () => {
-        try {
-            const callInfo = await videocallsApi.getCallInfo(channelId);
-            console.log('Active call status:', callInfo);
-            setHasActiveCall(callInfo.hasActiveCall);
-            if (callInfo.activeCall?.participants) {
-                const participantNames = callInfo.activeCall.participants.map((p) => `${p.firstName} ${p.lastName}`);
-                console.log('Participants:', participantNames);
-                setActiveParticipants(participantNames);
-            } else {
-                console.log('No participants in active call');
-                setActiveParticipants([]);
-            }
-        } catch (error) {
-            console.error('Error checking for active call:', error);
-        }
-    };
 
     const handleStartCall = async () => {
         try {
