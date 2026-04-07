@@ -290,6 +290,7 @@ export default function ChannelPage() {
   const [slackOAuthUrl, setSlackOAuthUrl] = useState<string | null>(null);
   const [availableSlackChannels, setAvailableSlackChannels] = useState<{ id: string, name: string }[]>([]);
   const [selectedSlackChannel, setSelectedSlackChannel] = useState<string>('');
+  const [importedSlackChannel, setImportedSlackChannel] = useState<{ id: string, name: string } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toasts, add: addToast, remove: removeToast } = useToast();
 
@@ -450,6 +451,7 @@ export default function ChannelPage() {
       });
 
       socket.on("slack_import_progress", (data: any) => {
+        console.log('[slack_import_progress]', data);
         if (data.status === 'started') {
             addToast("Slack import started...", "info");
             setIsSlackImporting(true);
@@ -464,11 +466,21 @@ export default function ChannelPage() {
         }
       });
 
-      socket.on("channel_logs_updated", async () => {
-         try {
-             const history = await channelsApi.getMessages(normalizedChannelId);
-             setMessages(history as Message[]);
-         } catch(e){}
+      socket.on("channel_logs_updated", async (data: any) => {
+        console.log('[channel_logs_updated] Received event, fetching messages...', data);
+        try {
+            console.log(`[channel_logs_updated] Fetching messages for channel: ${normalizedChannelId}`);
+            const history = await channelsApi.getMessages(normalizedChannelId);
+            console.log(`[channel_logs_updated] Got ${history.length} messages`);
+            setMessages(history as Message[]);
+            // Keep the imported channel banner visible for feedback
+            // Don't clear it immediately - user will see the banner showing what was imported
+            addToast(`Imported messages loaded!`, "success");
+        } catch(e) {
+            console.error('[channel_logs_updated] Failed to fetch messages:', e);
+            addToast(`Failed to load imported messages`, "error");
+            setImportedSlackChannel(null);
+        }
       });
 
       socket.on("channel_presence_updated", handlePresenceUpdated);
@@ -513,6 +525,8 @@ export default function ChannelPage() {
       mounted = false;
       if (socket) {
         socket.off("receive_message");
+        socket.off("slack_import_progress");
+        socket.off("channel_logs_updated");
         socket.off("channel_presence_updated", handlePresenceUpdated);
         socket.off("channel:call-started");
         socket.off("channel:call-ended");
@@ -658,11 +672,17 @@ export default function ChannelPage() {
 
     try {
       addToast("Starting Slack import...", "info");
+      // Find the channel name from available channels
+      const selectedChannel = availableSlackChannels.find(ch => ch.id === selectedSlackChannel);
+      if (selectedChannel) {
+        setImportedSlackChannel(selectedChannel);
+      }
       await integrationsApi.importSlackChannel(normalizedChannelId, selectedSlackChannel);
       addToast("Import started! Processing messages...", "success");
     } catch (error: any) {
       console.error("Slack import error:", error);
       addToast("Failed to start Slack import", "error");
+      setImportedSlackChannel(null);
     } finally {
       setIsSlackImporting(false);
     }
@@ -943,6 +963,25 @@ export default function ChannelPage() {
 
         {/* Messages area */}
         <div className={`flex-1 overflow-y-auto px-0 py-0 space-y-0 ck-scrollbar ${showVideoCall ? 'hidden' : ''}`} id="messages-container">
+          {/* Slack Import Banner */}
+          {importedSlackChannel && messages.length > 0 && (
+            <div className="sticky top-0 z-10 bg-gradient-to-r from-[#E01E5A]/10 to-[#E01E5A]/5 border-b border-[#E01E5A]/30 px-5 py-3 text-center">
+              <div className="flex items-center justify-center gap-2 text-[13px] text-[#E01E5A] font-medium">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M5.042 15.165a2.528 2.528 0 0 1-2.52 2.523A2.528 2.528 0 0 1 0 15.165a2.527 2.527 0 0 1 2.522-2.52h2.52v2.52zM6.313 15.165a2.527 2.527 0 0 1 2.521-2.52 2.527 2.527 0 0 1 2.521 2.52v6.313A2.528 2.528 0 0 1 8.834 24a2.528 2.528 0 0 1-2.521-2.522v-6.313zM8.834 5.042a2.528 2.528 0 0 1-2.521-2.52A2.528 2.528 0 0 1 8.834 0a2.528 2.528 0 0 1 2.521 2.522v2.52H8.834zM8.834 6.313a2.528 2.528 0 0 1 2.521 2.521 2.528 2.528 0 0 1-2.521 2.521H2.522A2.528 2.528 0 0 1 0 8.834a2.528 2.528 0 0 1 2.522-2.521h6.312zM18.956 8.834a2.528 2.528 0 0 1 2.522-2.521A2.528 2.528 0 0 1 24 8.834a2.528 2.528 0 0 1-2.522 2.521h-2.522V8.834zM17.688 8.834a2.528 2.528 0 0 1-2.523 2.521 2.527 2.527 0 0 1-2.52-2.521V2.522A2.527 2.527 0 0 1 15.165 0a2.528 2.528 0 0 1 2.523 2.522v6.312zM15.165 18.956a2.528 2.528 0 0 1 2.523 2.522A2.528 2.528 0 0 1 15.165 24a2.527 2.527 0 0 1-2.52-2.522v-2.522h2.52zM15.165 17.688a2.527 2.527 0 0 1-2.52-2.523 2.526 2.526 0 0 1 2.52-2.52h6.313A2.527 2.527 0 0 1 24 15.165a2.528 2.528 0 0 1-2.522 2.523h-6.313z" />
+                </svg>
+                <span>Imported from Slack <strong>#{importedSlackChannel.name}</strong></span>
+                <button
+                  onClick={() => setImportedSlackChannel(null)}
+                  className="ml-auto text-[11px] font-medium px-2 py-1 rounded hover:bg-[#E01E5A]/20 transition-colors"
+                  title="Dismiss banner"
+                >
+                  ✕
+                </button>
+              </div>
+            </div>
+          )}
+
           {!canAccessChannel ? (
             <div className="flex items-center justify-center h-full px-6 text-center">
               <div>
