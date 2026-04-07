@@ -574,6 +574,8 @@ import { addSlackImportJob } from '../workers/slackImport.queue.js';
 
 export const importSlackChannel = async (req: Request, res: Response) => {
   try {
+    console.log('[importSlackChannel] Received request');
+    
     const userId = req.user?.userId;
     if (!userId) {
       res.status(401).json({ error: 'Unauthorized' });
@@ -581,6 +583,8 @@ export const importSlackChannel = async (req: Request, res: Response) => {
     }
 
     const { channelId } = req.params;
+    console.log(`[importSlackChannel] Channel ID: ${channelId}, User ID: ${userId}`);
+    
     const channel = await ChannelModel.findOne({ channelId }).lean() as ChannelLean | null;
     if (!channel) {
       res.status(404).json({ error: 'Channel not found' });
@@ -598,16 +602,30 @@ export const importSlackChannel = async (req: Request, res: Response) => {
       return;
     }
 
-    // Add to BullMQ Slack Import queue
-    const job = await addSlackImportJob(channelId, slackChannelId, userId);
+    console.log(`[importSlackChannel] Adding job to queue for Slack channel: ${slackChannelId}`);
 
-    res.status(202).json({ 
-      message: 'Processing started', 
-      jobId: job.id, 
-      channelId 
-    });
+    try {
+      // Add to BullMQ Slack Import queue with timeout
+      const job = await Promise.race([
+        addSlackImportJob(channelId, slackChannelId, userId),
+        new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Queue operation timeout')), 10000)
+        )
+      ]);
+
+      console.log(`[importSlackChannel] Job queued with ID: ${(job as any).id}`);
+
+      res.status(202).json({ 
+        message: 'Processing started', 
+        jobId: (job as any).id, 
+        channelId 
+      });
+    } catch (queueError) {
+      console.error('[importSlackChannel] Queue error:', queueError);
+      res.status(503).json({ error: 'Queue service temporarily unavailable. Please try again.' });
+    }
   } catch (error) {
-    console.error('Error starting slack import:', error);
+    console.error('[importSlackChannel] Error starting slack import:', error);
     res.status(500).json({ error: 'Failed to queue import task' });
   }
 };

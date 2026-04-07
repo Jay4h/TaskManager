@@ -4,6 +4,26 @@ import { ENV } from './env.js';
 let redisInstance: Redis | null = null;
 let redisSubscriberInstance: Redis | null = null;
 
+// Parse Redis URL to extract connection options
+const parseRedisUrl = (url: string) => {
+    try {
+        const redisUrl = new URL(url);
+        return {
+            host: redisUrl.hostname || 'localhost',
+            port: parseInt(redisUrl.port || '6379', 10),
+            password: redisUrl.password || undefined,
+            username: redisUrl.username || undefined,
+            db: redisUrl.pathname ? parseInt(redisUrl.pathname.slice(1), 10) : 0,
+        };
+    } catch {
+        return {
+            host: 'localhost',
+            port: 6379,
+            db: 0,
+        };
+    }
+};
+
 // The main connection for basic commands, publisher, and standard queues
 export const getRedisClient = () => {
     if (!redisInstance) {
@@ -34,12 +54,5 @@ export const getRedisSubscriber = () => {
     return redisSubscriberInstance;
 };
 
-// BullMQ connection configuration standard
-export const connection = {
-    host: getRedisClient().options.host,
-    port: getRedisClient().options.port,
-    username: getRedisClient().options.username,
-    password: getRedisClient().options.password,
-    db: getRedisClient().options.db,
-    tls: getRedisClient().options.tls,
-};
+// BullMQ connection configuration - pass plain options object, not Redis instance
+export const connection = parseRedisUrl(ENV.REDIS_URL);
