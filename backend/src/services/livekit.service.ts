@@ -6,6 +6,26 @@ const LIVEKIT_URL = ENV.LIVEKIT_URL;
 const LIVEKIT_API_KEY = ENV.LIVEKIT_API_KEY;
 const LIVEKIT_API_SECRET = ENV.LIVEKIT_API_SECRET;
 
+function normalizeLiveKitUrl(rawUrl: string): string {
+    const trimmed = rawUrl.trim();
+    // Guard against malformed .env values like "URL KEY=..."
+    const firstToken = trimmed.split(/\s+/)[0];
+
+    let normalized = firstToken;
+    if (normalized.startsWith('https://')) {
+        normalized = `wss://${normalized.slice('https://'.length)}`;
+    } else if (normalized.startsWith('http://')) {
+        normalized = `ws://${normalized.slice('http://'.length)}`;
+    }
+
+    const parsed = new URL(normalized);
+    if (parsed.protocol !== 'ws:' && parsed.protocol !== 'wss:') {
+        throw new Error(`LIVEKIT_URL must use ws:// or wss://. Received: ${parsed.protocol}`);
+    }
+
+    return parsed.toString().replace(/\/$/, '');
+}
+
 export interface GenerateTokenParams {
     userId: string;
     userName: string;
@@ -39,6 +59,8 @@ export async function generateLiveKitToken({
         if (!LIVEKIT_URL) {
             throw new Error('LiveKit configuration missing: LIVEKIT_URL not set');
         }
+
+        const liveKitUrl = normalizeLiveKitUrl(LIVEKIT_URL);
 
         const at = new AccessToken(LIVEKIT_API_KEY, LIVEKIT_API_SECRET);
 

@@ -55,12 +55,19 @@ export class InboxService {
             });
 
             // Send email notification
-            await this.emailService.sendTaskAssignmentNotification(
-                assignedUser.email,
-                `${assignedUser.firstName} ${assignedUser.lastName}`,
-                taskName,
-                senderName
-            );
+            const assigneeEmail =
+                typeof assignedUser.email === "string" && assignedUser.email.trim().length > 0
+                    ? assignedUser.email.trim()
+                    : null;
+
+            if (assigneeEmail) {
+                await this.emailService.sendTaskAssignmentNotification(
+                    assigneeEmail,
+                    `${assignedUser.firstName} ${assignedUser.lastName}`,
+                    taskName,
+                    senderName
+                );
+            }
         } catch (error) {
             console.error("Error notifying task assignment:", error);
             // Don't throw - we don't want to fail task creation if notification fails
