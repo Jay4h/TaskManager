@@ -3,7 +3,7 @@ import { ENV } from '../config/env.js';
 import axios from 'axios';
 import { UserMongooseModel } from '../models/user.model.js';
 
-export const getSlackAuthUrl = (req: Request, res: Response) => {
+export const getSlackAuthUrl = async (req: Request, res: Response) => {
     // Generate Slack OAuth URL
     const clientId = ENV.SLACK_CLIENT_ID;
     const redirectUri = ENV.SLACK_REDIRECT_URI;
@@ -11,7 +11,7 @@ export const getSlackAuthUrl = (req: Request, res: Response) => {
     console.log('[Slack OAuth] 🔗 Generating OAuth URL...');
     console.log('[Slack OAuth]   - Client ID exists:', !!clientId);
     console.log('[Slack OAuth]   - Redirect URI:', redirectUri);
-    console.log('[Slack OAuth]   - Auth user:', !!req.user);
+    console.log('[Slack OAuth]   - Auth user object:', JSON.stringify(req.user));
     
     if (!clientId) {
         console.error('[Slack OAuth] ❌ Slack Client ID not configured');
@@ -25,12 +25,23 @@ export const getSlackAuthUrl = (req: Request, res: Response) => {
     // Pass user ID as local state to link account in callback
     const state = req.user?.userId;
     console.log('[Slack OAuth]   - User ID (state):', state);
+    console.log('[Slack OAuth]   - User email:', req.user?.email);
     
     if (!state) {
         console.error('[Slack OAuth] ❌ User not authenticated or no userId');
         res.status(401).json({ error: "User not authenticated" });
         return;
     }
+
+    // Verify user exists in DB before generating OAuth URL
+    console.log('[Slack OAuth] 🔍 Verifying user exists in database...');
+    const userExists = await UserMongooseModel.findById(state);
+    if (!userExists) {
+        console.error('[Slack OAuth] ❌ User', state, 'does not exist in database');
+        res.status(400).json({ error: "User not found in database. Cannot proceed with OAuth." });
+        return;
+    }
+    console.log('[Slack OAuth] ✅ User found in database:', userExists.email);
 
     const authUrl = `https://slack.com/oauth/v2/authorize?client_id=${clientId}&user_scope=${userScopes}&redirect_uri=${redirectUri}&state=${state}`;
     
@@ -110,7 +121,18 @@ export const handleSlackCallback = async (req: Request, res: Response) => {
         if (updateResult) {
             console.log('[Slack OAuth Callback]   - SlackIntegration exists:', !!updateResult.slackIntegration);
             console.log('[Slack OAuth Callback]   - Access token saved:', !!updateResult.slackIntegration?.accessToken);
+            console.log('[Slack OAuth Callback]   - Access token length:', updateResult.slackIntegration?.accessToken?.length);
+        } else {
+            console.error('[Slack OAuth Callback] ❌ USER NOT FOUND - no document returned from update');
+            res.status(400).send("User not found. OAuth state parameter may be invalid.");
+            return;
         }
+
+        // Verify the token was actually saved by doing a fresh read
+        console.log('[Slack OAuth Callback] 🔍 Verifying token was saved...');
+        const verifyUser = await UserMongooseModel.findById(userId);
+        console.log('[Slack OAuth Callback]   - Token exists in fresh read:', !!verifyUser?.slackIntegration?.accessToken);
+        console.log('[Slack OAuth Callback]   - Token length in fresh read:', verifyUser?.slackIntegration?.accessToken?.length);
 
         // The user will typically complete auth via a popup, so we can return a success HTML
         // that closes the popup.

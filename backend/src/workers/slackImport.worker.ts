@@ -27,8 +27,19 @@ export const startSlackImportWorker = () => {
             }
 
             console.log(`\n[Slack Import] 🔍 STEP 1: Fetching user ${triggerUserId} from database...`);
+            console.log(`[Slack Import]   - User ID type: ${typeof triggerUserId}`);
+            console.log(`[Slack Import]   - User ID length: ${triggerUserId?.length}`);
+            
             const user = await UserMongooseModel.findById(triggerUserId);
-            console.log(`[Slack Import] ✅ User found: ${user?._id}, has slackIntegration: ${!!user?.slackIntegration}`);
+            console.log(`[Slack Import] ✅ User query completed`);
+            console.log(`[Slack Import]   - User exists: ${!!user}`);
+            console.log(`[Slack Import]   - User._id: ${user?._id}`);
+            console.log(`[Slack Import]   - User.email: ${user?.email}`);
+            console.log(`[Slack Import]   - SlackIntegration: ${JSON.stringify(user?.slackIntegration || 'NOT SET')}`);
+            
+            if (!user) {
+                throw new Error(`User ${triggerUserId} not found in database`);
+            }
             
             const token = user?.slackIntegration?.accessToken;
             console.log(`[Slack Import] 🔑 Slack token exists: ${!!token} (length: ${token?.length || 0})`);
