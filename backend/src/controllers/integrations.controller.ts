@@ -81,9 +81,16 @@ export const handleSlackCallback = async (req: Request, res: Response) => {
                     <h2>Connection successful!</h2>
                     <p>You can close this window now.</p>
                     <script>
+                        console.log('Popup window loaded, window.opener:', !!window.opener);
                         setTimeout(() => {
-                            window.opener?.postMessage('slack-auth-success', '*');
-                            window.close();
+                            console.log('Sending message to opener...');
+                            if (window.opener) {
+                                window.opener.postMessage('slack-auth-success', '*');
+                                console.log('Message sent');
+                            } else {
+                                console.error('window.opener is null');
+                            }
+                            setTimeout(() => window.close(), 500);
                         }, 1000);
                     </script>
                 </body>

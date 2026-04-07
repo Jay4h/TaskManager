@@ -296,30 +296,34 @@ export default function ChannelPage() {
   const quickEmojis = ["😀", "😂", "😍", "🔥", "👍", "🎉", "✅", "🙏", "👀", "🤝", "❤️", "🚀"];
 
   // Slack API Integration setup
-  useEffect(() => {
-    const checkSlackAuth = async () => {
-      try {
-        const res = await integrationsApi.getSlackChannels();
-        setSlackConnected(true);
-        setAvailableSlackChannels(res.channels);
-      } catch (err: any) {
-        if (err.response?.status === 401) {
-          setSlackConnected(false);
-          try {
-            const authRes = await integrationsApi.getSlackAuthUrl();
-            setSlackOAuthUrl(authRes.url);
-          } catch (e) {
-            console.error("Failed to get Slack auth URL:", e);
-          }
-        } else {
-          console.error("Failed to check Slack auth:", err);
+  const checkSlackAuth = async () => {
+    try {
+      const res = await integrationsApi.getSlackChannels();
+      setSlackConnected(true);
+      setAvailableSlackChannels(res.channels);
+      addToast("Slack connected successfully!", "success");
+    } catch (err: any) {
+      if (err.response?.status === 401) {
+        setSlackConnected(false);
+        try {
+          const authRes = await integrationsApi.getSlackAuthUrl();
+          setSlackOAuthUrl(authRes.url);
+        } catch (e) {
+          console.error("Failed to get Slack auth URL:", e);
         }
+      } else {
+        console.error("Failed to check Slack auth:", err);
       }
-    };
+    }
+  };
+
+  useEffect(() => {
     checkSlackAuth();
 
     const handleMessage = (event: MessageEvent) => {
+      console.log("Message received:", event.data);
       if (event.data === 'slack-auth-success') {
+        console.log("Slack auth success message received, refreshing...");
         checkSlackAuth();
       }
     };

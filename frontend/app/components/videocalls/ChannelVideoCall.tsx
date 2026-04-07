@@ -214,24 +214,7 @@ export function ChannelVideoCall({ channelId, channelName, callType = 'video', o
         setError(`Connection failed: ${error.message || 'Unable to connect to video server'}`);
     };
 
-    const checkNetworkConnectivity = async () => {
-        try {
-            console.log('🌐 Checking network connectivity...');
-            const response = await fetch(url, { method: 'HEAD', mode: 'no-cors' });
-            console.log('✅ Network OK, server reachable');
-            return true;
-        } catch (err) {
-            console.error('❌ Network error:', err);
-            return false;
-        }
-    };
 
-    // Diagnostic effect to check connectivity on component mount
-    useEffect(() => {
-        if (token && url && roomName) {
-            checkNetworkConnectivity();
-        }
-    }, [token, url, roomName]);
 
     const handleLeaveRoom = useCallback(async () => {
         if (isLeavingRef.current) return; // prevent double-execution

@@ -27,14 +27,14 @@ export const generalLimiter = rateLimit({
  */
 export const startCallLimiter = rateLimit({
     windowMs: 60 * 60 * 1000, // 1 hour
-    max: 5,
+    max: 10,
     keyGenerator: (req) => {
         // Use user ID if authenticated, otherwise fall back to IP with proper IPv6 handling
         const userId = (req as any).user?.userId;
         return userId ? `start-call-${userId}` : `start-call-${ipKeyGenerator(req)}`;
     },
     message: {
-        error: 'Too many calls started. Maximum 5 calls per hour.',
+        error: 'Too many calls started. Maximum 10 calls per hour.',
     },
     standardHeaders: true,
     legacyHeaders: false,

@@ -183,19 +183,24 @@ export default function UsersClient() {
                   key={user._id}
                   className="grid grid-cols-[2fr_2fr_1fr_1.2fr_35px] gap-2 sm:gap-4 items-center px-3 sm:px-6 py-2 sm:py-2.5 border-b border-[var(--border-subtle)] last:border-0 hover:bg-[var(--bg-surface)] group text-[11px] sm:text-[13px] bg-[var(--bg-canvas)] transition-colors"
                 >
-                  {/* Name */}
-                  <div className="flex items-center gap-3 min-w-0">
-                    <div className="w-7 h-7 rounded-full bg-gray-700 text-white flex items-center justify-center text-[10px] font-bold flex-shrink-0">
-                      {user.firstName?.charAt(0)}{user.lastName?.charAt(0)}
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <span className="truncate font-medium text-[var(--text-primary)] block">{user.firstName} {user.lastName}</span>
-                    </div>
-                    {user.emailVerified ? (
-                      <img src="/verified-badge.svg" alt="Verified" className="w-4 h-4 flex-shrink-0" title="Email Verified" />
-                    ) : null}
-                  </div>
+            {/* Name */}
+            <div className="min-w-0 flex-1 flex items-center gap-2">
+              <div className="w-7 h-7 rounded-full bg-gray-700 text-white flex items-center justify-center text-[10px] font-bold flex-shrink-0">
+                    {user.firstName?.charAt(0)}{user.lastName?.charAt(0)}
+              </div>
+              <span className="truncate font-medium text-[var(--text-primary)]">
+              {user.firstName} {user.lastName}
+              </span>
 
+              {user.emailVerified ? (
+              <img
+              src="/verified-badge.svg"
+              alt="Verified"
+              className="w-4 h-4 flex-shrink-0"
+              title="Email Verified"
+              />
+              ) : null}
+          </div>
                   {/* Email */}
                   <div className="text-[11px] sm:text-[13px] text-[var(--text-secondary)] truncate">
                     {user.email}
