@@ -894,8 +894,8 @@ export default function ChannelPage() {
                     {showDiv && <DateDivider label={formatDateDivider(firstMsg.createdAt)} />}
 
                     {/* Message group */}
-                    <div className={`flex px-5 py-2 ${group.isMe ? "justify-end" : "justify-start"}`}>
-                      <div className={`flex gap-2 max-w-[72%] ${group.isMe ? "flex-row-reverse" : "flex-row"}`}>
+                    <div className={`flex px-3 sm:px-5 py-2 ${group.isMe ? "justify-end" : "justify-start"}`}>
+                      <div className={`flex gap-2 max-w-[85%] sm:max-w-[72%] ${group.isMe ? "flex-row-reverse" : "flex-row"}`}>
                         {/* Avatar */}
                         <div className="flex-shrink-0 mt-1">
                           {group.isMe ? (
@@ -1012,7 +1012,7 @@ export default function ChannelPage() {
         )}
 
         {/* Message composer */}
-        <div className={`flex-none px-6 pb-6 pt-2 ${showVideoCall ? 'hidden' : ''}`}>
+        <div className={`flex-none px-3 sm:px-6 pb-4 sm:pb-6 pt-2 relative ${showVideoCall ? 'hidden' : ''}`}>
           {canAccessChannel && !canMessageInChannel && !hideJoinPrompt && (
             <div className="mb-2 flex items-center justify-between rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-3 py-2">
               <p className="text-[12px] text-[var(--text-secondary)]">

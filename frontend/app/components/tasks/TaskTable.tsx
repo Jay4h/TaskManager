@@ -809,17 +809,17 @@ export default function TaskTable({ initialFilter, projectFilter, assignedToFilt
             const config = groupConfigs[key];
 
             return (
-              <div
-                key={key}
-                onDragOver={(e) => handleStatusDragOver(e, key)}
-                onDrop={(e) => handleStatusDrop(e, key)}
-                onDragLeave={() => {
-                  if (dragOverStatus === key) {
-                    setDragOverStatus(null);
-                  }
-                }}
-                className={`flex-none w-[320px] bg-[var(--bg-surface-2)] border rounded-xl flex flex-col max-h-[calc(100vh-220px)] shadow-sm snap-start transition-colors ${dragOverStatus === key ? "border-[var(--accent)]" : "border-[var(--border-subtle)]"}`}
-              >
+                <div
+                  key={key}
+                  onDragOver={(e) => handleStatusDragOver(e, key)}
+                  onDrop={(e) => handleStatusDrop(e, key)}
+                  onDragLeave={() => {
+                    if (dragOverStatus === key) {
+                      setDragOverStatus(null);
+                    }
+                  }}
+                  className={`flex-none w-[280px] sm:w-[320px] bg-[var(--bg-surface-2)] border rounded-xl flex flex-col max-h-[calc(100dvh-200px)] sm:max-h-[calc(100vh-220px)] shadow-sm snap-start transition-colors ${dragOverStatus === key ? "border-[var(--accent)]" : "border-[var(--border-subtle)]"}`}
+                >
                 <div className="px-3 py-3 flex items-center justify-between border-b border-[var(--border-subtle)] bg-[var(--bg-canvas)] rounded-t-xl">
                   <div className="flex items-center gap-2">
                     <div className={`px-2 py-0.5 rounded-md text-[10px] font-bold tracking-wider ${config.bgColor} ${config.textColor}`}>
@@ -1821,7 +1821,7 @@ function TaskRow({ task, expandedTaskId, setExpandedTaskId, formatDueDate, isDue
         onDragStart={(e) => onTaskDragStart?.(e, task)}
         onDragEnd={() => onTaskDragEnd?.()}
         onClick={() => setExpandedTaskId(isExpanded ? null : task._id)}
-        className={`grid grid-cols-[1fr_100px_120px_120px_100px_110px_35px] gap-1.5 sm:gap-2 items-center px-3 sm:px-4 py-2 sm:py-2.5 border-b border-[var(--border-subtle)] last:border-0 hover:bg-[var(--bg-surface)] group text-[12px] sm:text-[14px] bg-[var(--bg-canvas)] transition-colors cursor-pointer ${enableDrag ? "cursor-grab active:cursor-grabbing" : ""} ${draggingTaskId === task._id ? "opacity-60" : "opacity-100"} ${updatingTaskId === task._id ? "pointer-events-none" : ""}`}
+        className={`grid grid-cols-[1fr_100px_120px_120px_100px_110px_35px] gap-1.5 sm:gap-2 items-center px-3 sm:px-4 py-3 sm:py-2.5 border-b border-[var(--border-subtle)] last:border-0 hover:bg-[var(--bg-surface)] group text-[12px] sm:text-[14px] bg-[var(--bg-canvas)] transition-colors cursor-pointer ${enableDrag ? "cursor-grab active:cursor-grabbing" : ""} ${draggingTaskId === task._id ? "opacity-60" : "opacity-100"} ${updatingTaskId === task._id ? "pointer-events-none" : ""}`}
       >
         {/* Name */}
         <div className="flex items-center gap-2 pl-1 sm:pl-2">

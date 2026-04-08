@@ -24,6 +24,8 @@ import { AgentAudioVisualizerBar } from '@/components/agent-audio-visualizer-bar
 import { useCall } from '@/app/providers/CallProvider';
 import {
     ChevronDownIcon,
+    ArrowsPointingOutIcon,
+    ArrowsPointingInIcon,
     SpeakerWaveIcon,
     UserPlusIcon,
     VideoCameraIcon,
@@ -69,6 +71,8 @@ export function ChannelVideoCall({ channelId, channelName, onCallEnd, theme = 'd
     const [minutesRemaining, setMinutesRemaining] = useState(0);
     const [showChat, setShowChat] = useState(false);
     const [chatUnread, setChatUnread] = useState(0);
+    const [isFullscreen, setIsFullscreen] = useState(false);
+    const containerRef = useRef<HTMLDivElement>(null);
     const durationInterval = useRef<NodeJS.Timeout | null>(null);
     const connectionTimeoutRef = useRef<NodeJS.Timeout | null>(null);
     // Prevents the onDisconnected callback from double-calling handleLeaveRoom
@@ -229,6 +233,9 @@ export function ChannelVideoCall({ channelId, channelName, onCallEnd, theme = 'd
 
         try {
             if (explicit) {
+                if (document.fullscreenElement) {
+                    document.exitFullscreen().catch(err => console.error("Error exiting fullscreen:", err));
+                }
                 if (callId) {
                     await videocallsApi.endCall(channelId, callId);
                 } else {
@@ -246,6 +253,29 @@ export function ChannelVideoCall({ channelId, channelName, onCallEnd, theme = 'd
             }
         }
     }, [channelId, callId, onCallEnd, globalEndCall]);
+
+    const toggleFullscreen = useCallback(async () => {
+        if (!containerRef.current) return;
+
+        try {
+            if (!document.fullscreenElement) {
+                await containerRef.current.requestFullscreen();
+            } else {
+                await document.exitFullscreen();
+            }
+        } catch (err) {
+            console.error("Error toggling fullscreen:", err);
+        }
+    }, []);
+
+    useEffect(() => {
+        const handleFullscreenChange = () => {
+            setIsFullscreen(!!document.fullscreenElement);
+        };
+
+        document.addEventListener('fullscreenchange', handleFullscreenChange);
+        return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
+    }, []);
 
     if (loading) {
         // loading is now always false on mount — this block is a safety fallback only
@@ -284,7 +314,22 @@ export function ChannelVideoCall({ channelId, channelName, onCallEnd, theme = 'd
     }
 
     return (
-        <div className="w-full h-full bg-[#0f0f11] overflow-hidden relative flex flex-col">
+        <div ref={containerRef} className="w-full h-full bg-[#0f0f11] overflow-hidden relative flex flex-col">
+            {/* Maximize Toggle Button */}
+            <div className={`absolute top-4 left-4 z-40 transition-all duration-300 ${isFullscreen ? 'scale-110 opacity-70 hover:opacity-100' : 'opacity-40 hover:opacity-100'}`}>
+                <button 
+                    onClick={toggleFullscreen}
+                    className="p-2.5 rounded-xl bg-black/40 hover:bg-black/60 text-white/90 shadow-2xl backdrop-blur-md border border-white/10 group active:scale-95 transition-all"
+                    title={isFullscreen ? "Exit Fullscreen" : "Maximize Screen"}
+                >
+                    {isFullscreen ? (
+                        <ArrowsPointingInIcon className="w-5 h-5 group-hover:scale-110 transition-transform" />
+                    ) : (
+                        <ArrowsPointingOutIcon className="w-5 h-5 group-hover:scale-110 transition-transform" />
+                    )}
+                </button>
+            </div>
+
             <LiveKitRoom
                 video={true}
                 audio={true}
@@ -364,8 +409,8 @@ export function ChannelVideoCall({ channelId, channelName, onCallEnd, theme = 'd
                     </div>
 
                     {/* Bottom Control Bar */}
-                    <div className="mt-6 flex justify-center pb-4 z-20">
-                        <div className="bg-[#1e1f26]/95 rounded-[2.5rem] p-3 px-6 flex items-center gap-6 shadow-[0_20px_50px_rgba(0,0,0,0.5)] border border-white/5 backdrop-blur-xl">
+                    <div className="mt-4 sm:mt-6 flex justify-center pb-2 sm:pb-4 z-20">
+                        <div className="bg-[#1e1f26]/95 rounded-[2.5rem] p-2 px-4 sm:p-3 sm:px-6 flex items-center gap-3 sm:gap-6 shadow-[0_20px_50px_rgba(0,0,0,0.5)] border border-white/5 backdrop-blur-xl max-w-full overflow-x-auto ck-scrollbar">
                             <ControlButton
                                 icon={VideoCameraIcon}
                                 offIcon={VideoCameraSlashIcon}
