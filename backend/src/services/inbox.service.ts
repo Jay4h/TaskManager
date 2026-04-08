@@ -1,5 +1,5 @@
 import mongoose from "mongoose";
-import { InboxModel, NotificationType, TaskStatusNotificationType } from "../models/inbox.model.js";
+import { InboxModel, TaskStatusNotificationType } from "../models/inbox.model.js";
 import { EmailService } from "./email.service.js";
 
 export class InboxService {
@@ -52,7 +52,7 @@ export class InboxService {
                 message: `${senderName} has assigned you the task "${taskName}"`,
                 isRead: false,
                 createdAt: new Date(),
-            });
+            } as any);
 
             // Send email notification
             const assigneeEmail =
@@ -142,7 +142,7 @@ export class InboxService {
                 newStatus,
                 isRead: false,
                 createdAt: new Date(),
-            });
+            } as any);
 
             // Send email notification
             await this.emailService.sendTaskStatusChangeNotification(

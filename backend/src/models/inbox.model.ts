@@ -1,4 +1,4 @@
-import mongoose, { Schema, Document, Model, Types } from "mongoose";
+import mongoose, { Schema, Document, Model } from "mongoose";
 
 export type NotificationType = "task-assigned" | "task-status-changed";
 export type TaskStatusNotificationType = "to-do" | "in-progress" | "completed";
