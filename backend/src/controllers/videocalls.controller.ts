@@ -536,7 +536,7 @@ export async function getUserCallStats(req: Request, res: Response): Promise<voi
 }
 
 // Get all currently active video calls across all channels
-export async function getActiveCalls(req: Request, res: Response): Promise<void> {
+export async function getActiveCalls(_req: Request, res: Response): Promise<void> {
     try {
         // Find channels with an active call. $ne: null works for non-existent values too.
         const activeChannels = await ChannelModel.find({ 

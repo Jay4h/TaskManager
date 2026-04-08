@@ -798,48 +798,6 @@ export default function ChannelPage() {
           </div>
         </header>
 
-        {/* In-channel incoming call notice — matches app design system */}
-        {incomingCallNotice && !showVideoCall && (
-          <div
-            className="flex-none flex items-center justify-between gap-3 px-5 py-2.5 border-b border-[var(--border-subtle)] bg-[var(--bg-surface)]"
-          >
-            <div className="flex items-center gap-2.5">
-              {/* Pulsing icon */}
-              <div className="w-7 h-7 rounded-full bg-[var(--bg-surface-2)] border border-[var(--border-default)] flex items-center justify-center flex-shrink-0">
-                <svg viewBox="0 0 24 24" fill="currentColor" className="w-3.5 h-3.5 text-[var(--ck-blue)]">
-                  <path d="M17 10.5V7a1 1 0 0 0-1-1H4a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-3.5l4 4v-11l-4 4z" />
-                </svg>
-              </div>
-              <div>
-                <span className="text-[13px] font-semibold text-[var(--text-primary)]">
-                  {incomingCallNotice.initiatorName}
-                </span>
-                <span className="text-[13px] text-[var(--text-secondary)] ml-1">
-                  started a call in this channel
-                </span>
-              </div>
-            </div>
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => {
-                  setIncomingCallNotice(null);
-                  setCallType('video');
-                  setShowVideoCall(true);
-                }}
-                className="px-3 py-1.5 rounded-md bg-[var(--ck-blue)] hover:opacity-90 text-white text-[12px] font-medium transition-opacity"
-              >
-                Join Call
-              </button>
-              <button
-                onClick={() => setIncomingCallNotice(null)}
-                className="px-3 py-1.5 rounded-md border border-[var(--border-subtle)] hover:bg-[var(--bg-surface-2)] text-[var(--text-secondary)] text-[12px] font-medium transition-colors"
-              >
-                Dismiss
-              </button>
-            </div>
-          </div>
-        )}
-
 
         {/* Call section (Voice or Video) */}
         {showVideoCall ? (
