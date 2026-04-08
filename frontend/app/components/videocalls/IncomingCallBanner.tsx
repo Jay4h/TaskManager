@@ -1,8 +1,9 @@
 'use client';
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation';
 import { useSocket } from '../../providers/SocketProvider';
+import { videocallsApi } from '../../../src/api/videocalls.api';
 
 /* ─── GSAP ─── */
 let gsap: any = null;
@@ -17,6 +18,7 @@ interface IncomingCall {
   roomName: string;
   initiator: { id: string; name: string };
   startedAt: string;
+  type: 'voice' | 'video';
   recordingEnabled?: boolean;
 }
 
@@ -37,6 +39,7 @@ function avatarBg(name: string) {
 export function GlobalIncomingCallBanner() {
   const { socket, isConnected } = useSocket();
   const router = useRouter();
+  const pathname = usePathname();
   const [calls, setCalls] = useState<IncomingCall[]>([]);
   const dismissTimers = useRef<Record<string, NodeJS.Timeout>>({});
 
@@ -53,6 +56,49 @@ export function GlobalIncomingCallBanner() {
     router.push(`/dashboard/channels/${call.channelId}?openCall=1`);
   }, [dismiss, router]);
 
+  // Fetch all active calls on mount for persistence across refreshes
+  useEffect(() => {
+    if (!isConnected) return;
+
+    const fetchActiveCalls = async () => {
+      try {
+        const activeCalls = await videocallsApi.getActiveCalls();
+
+        // Get current user ID to avoid showing banner for own calls
+        let currentUserId = null;
+        try {
+          const userJson = typeof window !== 'undefined' ? localStorage.getItem('user') : null;
+          if (userJson) {
+            currentUserId = JSON.parse(userJson).userId;
+          }
+        } catch (e) {}
+
+        const formatted = activeCalls
+          .filter(ac => !currentUserId || ac.initiator.id !== currentUserId)
+          .map(ac => ({
+            callId: '', // Placeholder as we join by channel/room mainly
+            channelId: ac.channelId,
+            channelName: ac.channelName,
+            roomName: ac.roomName,
+            initiator: ac.initiator,
+            startedAt: ac.startedAt,
+            type: ac.type || 'video',
+          }));
+
+        setCalls(prev => {
+          // Merge with existing calls from socket events, avoiding duplicates
+          const existingIds = new Set(prev.map(c => c.channelId));
+          const newCalls = formatted.filter(ac => !existingIds.has(ac.channelId));
+          return [...prev, ...newCalls];
+        });
+      } catch (err) {
+        console.error('❌ Failed to fetch active calls on mount:', err);
+      }
+    };
+
+    fetchActiveCalls();
+  }, [isConnected]);
+
   useEffect(() => {
     if (!socket || !isConnected) return;
 
@@ -62,6 +108,7 @@ export function GlobalIncomingCallBanner() {
       roomName: string;
       initiator: { id: string; name: string };
       startedAt: string;
+      type: 'voice' | 'video';
       recordingEnabled?: boolean;
     }) => {
       let currentUserId = null;
@@ -81,6 +128,7 @@ export function GlobalIncomingCallBanner() {
           roomName: data.roomName,
           initiator: data.initiator,
           startedAt: data.startedAt,
+          type: data.type || 'video',
           recordingEnabled: data.recordingEnabled,
         };
         dismissTimers.current[data.channelId] = setTimeout(() => {
@@ -106,7 +154,13 @@ export function GlobalIncomingCallBanner() {
     return () => { Object.values(timers).forEach(clearTimeout); };
   }, []);
 
-  if (calls.length === 0) return null;
+  // Extract current channel from pathname (e.g., /dashboard/channels/general -> general)
+  const currentChannelId = pathname?.split('/').pop()?.toLowerCase() || '';
+
+  // Filter calls to only show the one for the current channel
+  const filteredCalls = calls.filter((c) => c.channelId.toLowerCase() === currentChannelId);
+
+  if (filteredCalls.length === 0) return null;
 
   return (
     <>

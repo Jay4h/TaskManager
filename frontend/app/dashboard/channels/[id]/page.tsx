@@ -21,6 +21,7 @@ import {
   type ChannelUser,
 } from "../../../../src/api/channels.api";
 import { ChannelVideoCall } from "../../../components/videocalls/ChannelVideoCall";
+import { ChannelVoiceCall } from "../../../components/videocalls/ChannelVoiceCall";
 import { ChannelCallPrompt } from "../../../components/videocalls/ChannelCallPrompt";
 import { videocallsApi } from "../../../../src/api/videocalls.api";
 
@@ -268,8 +269,6 @@ export default function ChannelPage() {
   const [callType, setCallType] = useState<'voice' | 'video'>('video');
   const [callStarted, setCallStarted] = useState(false);
   const [callData, setCallData] = useState<{ token: string; url: string; roomName: string; callId?: string } | null>(null);
-  // In-channel call notification: someone started a call while user is on this page
-  const [incomingCallNotice, setIncomingCallNotice] = useState<{ initiatorName: string } | null>(null);
 
   // Launch a call directly — start if none active, join if one is running
   const [callLaunching, setCallLaunching] = useState(false);
@@ -395,6 +394,8 @@ export default function ChannelPage() {
     };
     fetchChannelAndHistory();
 
+    // Fetch call info for this channel on mount removed - handled by GlobalIncomingCallBanner
+
     // Fetch all users for inline Add People search
     const fetchAllUsers = async () => {
       try {
@@ -440,24 +441,7 @@ export default function ChannelPage() {
 
       socket.on("channel_presence_updated", handlePresenceUpdated);
 
-      // Show an in-page banner when someone starts a call in this channel
-      // (the global banner handles other pages; this handles the in-channel case)
-      socket.on("channel:call-started", (data: any) => {
-        if (data.channelId === normalizedChannelId) {
-          // Ignore if the current user initiated the call
-          if (currentUser && data.initiator?.id === currentUser._id) return;
-
-          setIncomingCallNotice({ initiatorName: data.initiator?.name || 'Someone' });
-          // Auto-dismiss after 20 seconds
-          setTimeout(() => setIncomingCallNotice(null), 20000);
-        }
-      });
-
-      socket.on("channel:call-ended", (data: any) => {
-        if (data.channelId === normalizedChannelId) {
-          setIncomingCallNotice(null);
-        }
-      });
+      // In-channel call notice logic removed - handled by GlobalIncomingCallBanner
 
       socket.on("user_typing_start", (data: { channelId: string; userId: string }) => {
         if (data.channelId === normalizedChannelId) {
@@ -481,8 +465,6 @@ export default function ChannelPage() {
       if (socket) {
         socket.off("receive_message");
         socket.off("channel_presence_updated", handlePresenceUpdated);
-        socket.off("channel:call-started");
-        socket.off("channel:call-ended");
         socket.off("user_typing_start");
         socket.off("user_typing_stop");
         socket.emit("leave_channel", normalizedChannelId);
@@ -858,7 +840,8 @@ export default function ChannelPage() {
           </div>
         )}
 
-        {/* Video call section */}
+
+        {/* Call section (Voice or Video) */}
         {showVideoCall ? (
           <div style={{ flex: 1, display: 'flex', flexDirection: 'column', background: '#0a0c10', overflow: 'hidden', position: 'relative' }}>
             {callStarted && callData ? (
@@ -993,8 +976,8 @@ export default function ChannelPage() {
                     {showDiv && <DateDivider label={formatDateDivider(firstMsg.createdAt)} />}
 
                     {/* Message group */}
-                    <div className={`flex px-5 py-2 ${group.isMe ? "justify-end" : "justify-start"}`}>
-                      <div className={`flex gap-2 max-w-[72%] ${group.isMe ? "flex-row-reverse" : "flex-row"}`}>
+                    <div className={`flex px-3 sm:px-5 py-2 ${group.isMe ? "justify-end" : "justify-start"}`}>
+                      <div className={`flex gap-2 max-w-[85%] sm:max-w-[72%] ${group.isMe ? "flex-row-reverse" : "flex-row"}`}>
                         {/* Avatar */}
                         <div className="flex-shrink-0 mt-1">
                           {group.isMe ? (
@@ -1111,7 +1094,7 @@ export default function ChannelPage() {
         )}
 
         {/* Message composer */}
-        <div className={`flex-none px-6 pb-6 pt-2 ${showVideoCall ? 'hidden' : ''}`}>
+        <div className={`flex-none px-3 sm:px-6 pb-4 sm:pb-6 pt-2 relative ${showVideoCall ? 'hidden' : ''}`}>
           {canAccessChannel && !canMessageInChannel && !hideJoinPrompt && (
             <div className="mb-2 flex items-center justify-between rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-3 py-2">
               <p className="text-[12px] text-[var(--text-secondary)]">

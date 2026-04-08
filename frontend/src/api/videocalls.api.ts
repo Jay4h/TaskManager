@@ -14,11 +14,16 @@ export interface CallInfo {
     activeCall: {
         roomName: string;
         startedAt: string;
+        initiator?: {
+            id: string;
+            name: string;
+        };
         participants: Array<{
             _id: string;
             firstName: string;
             lastName: string;
         }>;
+        type: 'voice' | 'video';
     } | null;
 }
 
@@ -33,6 +38,7 @@ export interface CallHistory {
     duration: number;
     recordingUrl?: string;
     recordingEnabled: boolean;
+    type: 'voice' | 'video';
 }
 
 export interface CallHistoryResponse {
@@ -50,10 +56,23 @@ export interface UserCallStats {
     totalCalls: number;
 }
 
+export interface ActiveCall {
+    channelId: string;
+    channelName: string;
+    roomName: string;
+    startedAt: string;
+    initiator: {
+        id: string;
+        name: string;
+    };
+    participantsCount: number;
+    type: 'voice' | 'video';
+}
+
 export const videocallsApi = {
-    // Start a new video call with optional recording
-    startCall: async (channelId: string, recordingEnabled: boolean = false): Promise<VideoCallToken> => {
-        const response = await api.post(`/videocalls/${channelId}/start-call`, { recordingEnabled });
+    // Start a new call with optional recording and type (voice/video)
+    startCall: async (channelId: string, recordingEnabled: boolean = false, type: 'voice' | 'video' = 'video'): Promise<VideoCallToken> => {
+        const response = await api.post(`/videocalls/${channelId}/start-call`, { recordingEnabled, type });
         return response.data;
     },
 
@@ -96,6 +115,12 @@ export const videocallsApi = {
     // Get user call statistics
     getUserCallStats: async (): Promise<UserCallStats> => {
         const response = await api.get('/videocalls/stats/user-stats');
+        return response.data;
+    },
+
+    // Get all currently active video calls across all channels
+    getActiveCalls: async (): Promise<ActiveCall[]> => {
+        const response = await api.get('/videocalls/active');
         return response.data;
     },
 };

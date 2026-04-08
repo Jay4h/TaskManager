@@ -24,8 +24,11 @@ import {
   EllipsisHorizontalIcon,
   XMarkIcon,
   UserGroupIcon,
+  UserCircleIcon,
 } from "@heroicons/react/24/outline";
 import { SkeletonSidebarItems } from "./Skeleton";
+import { useCall } from "../providers/CallProvider";
+import { AgentAudioVisualizerRadial } from "@/components/agent-audio-visualizer-radial";
 
 /* ─── Channel member type ───────────────────────────────────── */
 type ChannelMember = { _id: string; firstName: string; lastName: string; email?: string };
@@ -240,6 +243,7 @@ export default function Sidebar({ userRole }: SidebarProps) {
   const searchParams = useSearchParams();
   const router = useRouter();
   const queryClient = useQueryClient();
+  const { currentAudioTrack } = useCall();
   const [user, setUser] = useState<User | null>(null);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
@@ -1154,12 +1158,21 @@ export default function Sidebar({ userRole }: SidebarProps) {
             </button>
             {/* User avatar */}
             {user && (
-              <div
-                className="w-7 h-7 rounded-full bg-gray-600 text-white flex items-center justify-center text-[10px] font-bold cursor-pointer hover:ring-2 hover:ring-white/20 transition-all mt-1"
-                title={`${user.firstName} ${user.lastName}`}
-                onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-              >
-                {user.firstName?.charAt(0)}{user.lastName?.charAt(0)}
+              <div className="relative mt-1">
+                <AgentAudioVisualizerRadial 
+                  audioTrack={currentAudioTrack || undefined}
+                  state={currentAudioTrack ? 'speaking' : 'listening'}
+                  size="icon"
+                  color="#6366f1"
+                >
+                  <div
+                    className="w-7 h-7 rounded-full bg-gray-600 text-white flex items-center justify-center text-[10px] font-bold cursor-pointer hover:ring-2 hover:ring-white/20 transition-all"
+                    title={`${user.firstName} ${user.lastName}`}
+                    onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+                  >
+                    {user.firstName?.charAt(0)}{user.lastName?.charAt(0)}
+                  </div>
+                </AgentAudioVisualizerRadial>
               </div>
             )}
           </div>
@@ -1178,9 +1191,16 @@ export default function Sidebar({ userRole }: SidebarProps) {
                   onClick={() => setIsDropdownOpen(!isDropdownOpen)}
                   className="flex items-center gap-2 w-full p-2 rounded-lg hover:bg-[var(--bg-surface-2)] transition-all"
                 >
-                  <div className="flex h-6 w-6 items-center justify-center rounded-full bg-gray-700 text-white text-[9px] font-bold flex-shrink-0">
-                    {user.firstName?.charAt(0)}{user.lastName?.charAt(0)}
-                  </div>
+                  <AgentAudioVisualizerRadial 
+                    audioTrack={currentAudioTrack || undefined}
+                    state={currentAudioTrack ? 'speaking' : 'listening'}
+                    size="icon"
+                    color="#6366f1"
+                  >
+                    <div className="flex h-6 w-6 items-center justify-center rounded-full bg-gray-700 text-white text-[9px] font-bold flex-shrink-0">
+                      {user.firstName?.charAt(0)}{user.lastName?.charAt(0)}
+                    </div>
+                  </AgentAudioVisualizerRadial>
                   <div className="flex-1 text-left overflow-hidden">
                     <p className="text-[11px] font-medium text-[var(--text-primary)] truncate">{user.firstName} {user.lastName}</p>
                     <p className="text-[10px] text-[var(--text-muted)] truncate">{user.email}</p>
