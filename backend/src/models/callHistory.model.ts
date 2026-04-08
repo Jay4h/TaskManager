@@ -11,6 +11,7 @@ export interface CallHistoryDocument extends Document {
     recordingUrl?: string;
     recordingEnabled: boolean;
     recordingStartedAt?: Date; // When recording was started
+    type: 'voice' | 'video';
     durationVerifiedByLiveKit?: boolean; // Flag to indicate if duration came from LiveKit webhook
     messagesSent: number;
     createdAt: Date;
@@ -29,6 +30,7 @@ const callHistorySchema = new Schema<CallHistoryDocument>(
         recordingUrl: { type: String },
         recordingEnabled: { type: Boolean, default: false },
         recordingStartedAt: { type: Date },
+        type: { type: String, enum: ['voice', 'video'], default: 'video' },
         durationVerifiedByLiveKit: { type: Boolean, default: false },
         messagesSent: { type: Number, default: 0 },
     },

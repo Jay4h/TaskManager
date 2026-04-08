@@ -47,3 +47,6 @@ coverage/
 *.pem
 .pow
 .devbox.json
+
+# Root README (keep private)
+/README.md

@@ -10,7 +10,8 @@ import mongoose from 'mongoose';
 export async function startChannelVideoCall(req: Request, res: Response): Promise<void> {
     try {
         const { channelId } = req.params;
-        const { recordingEnabled } = req.body;
+        const { recordingEnabled, type } = req.body;
+        const callType = type === 'voice' ? 'voice' : 'video';
         const userId = (req as any).user?.userId;
 
         console.log('Video call request - userId:', userId, 'channelId:', channelId);
@@ -67,7 +68,9 @@ export async function startChannelVideoCall(req: Request, res: Response): Promis
                 activeCall: {
                     roomName,
                     startedAt,
+                    initiatorId: objectId,
                     participants: [objectId],
+                    type: callType,
                 },
             },
             { new: true }
@@ -80,6 +83,7 @@ export async function startChannelVideoCall(req: Request, res: Response): Promis
             initiatorId: objectId,
             participantIds: [objectId],
             startedAt,
+            type: callType,
             recordingEnabled: recordingEnabled || false,
         });
 
@@ -94,6 +98,7 @@ export async function startChannelVideoCall(req: Request, res: Response): Promis
                 name: `${user.firstName} ${user.lastName}`,
             },
             startedAt,
+            type: callType,
             recordingEnabled: recordingEnabled || false,
         });
 
@@ -346,15 +351,31 @@ export async function getChannelCallInfo(req: Request, res: Response): Promise<v
 
         // Manually populate participants since they're embedded
         const participantIds = channel.activeCall.participants || [];
-        const participants = await UserMongooseModel.find({ _id: { $in: participantIds } })
+        const initiatorId = channel.activeCall.initiatorId;
+
+        const allUserIds = [...participantIds];
+        if (initiatorId && !allUserIds.some(id => String(id) === String(initiatorId))) {
+            allUserIds.push(initiatorId);
+        }
+
+        const users = await UserMongooseModel.find({ _id: { $in: allUserIds } })
             .select('firstName lastName email')
             .lean();
+
+        const userMap = new Map(users.map(u => [String(u._id), u]));
+        const participants = participantIds.map(id => userMap.get(String(id))).filter(Boolean);
+        const initiator = initiatorId ? userMap.get(String(initiatorId)) : null;
 
         res.json({
             hasActiveCall: true,
             activeCall: {
                 ...channel.activeCall,
                 participants,
+                initiator: initiator ? {
+                    id: String(initiator._id),
+                    name: `${initiator.firstName} ${initiator.lastName}`
+                } : null,
+                type: channel.activeCall.type || 'video',
             },
         });
     } catch (error) {
@@ -511,5 +532,59 @@ export async function getUserCallStats(req: Request, res: Response): Promise<voi
     } catch (error) {
         console.error('Error getting call stats:', error);
         res.status(500).json({ error: 'Failed to get call stats' });
+    }
+}
+
+// Get all currently active video calls across all channels
+export async function getActiveCalls(req: Request, res: Response): Promise<void> {
+    try {
+        // Find channels with an active call. $ne: null works for non-existent values too.
+        const activeChannels = await ChannelModel.find({ 
+            'activeCall.roomName': { $exists: true, $ne: null } 
+        }).lean();
+
+        if (activeChannels.length === 0) {
+            res.json([]);
+            return;
+        }
+
+        // Gather all user IDs we might need for one batch query (initiators and participants)
+        const userIds = new Set<string>();
+        activeChannels.forEach(c => {
+            if (c.activeCall?.initiatorId) userIds.add(String(c.activeCall.initiatorId));
+            c.activeCall?.participants?.forEach(p => userIds.add(String(p)));
+        });
+
+        // Batch fetch all required users
+        const users = await UserMongooseModel.find({ _id: { $in: Array.from(userIds) } })
+            .select('firstName lastName email')
+            .lean();
+
+        const userMap = new Map(users.map(u => [String(u._id), u]));
+
+        // Transform into a frontend-friendly format
+        const result = activeChannels.map(channel => {
+            const initiator = channel.activeCall?.initiatorId 
+                ? userMap.get(String(channel.activeCall.initiatorId)) 
+                : null;
+
+            return {
+                channelId: channel.channelId,
+                channelName: channel.name,
+                roomName: channel.activeCall?.roomName,
+                startedAt: channel.activeCall?.startedAt,
+                initiator: initiator ? {
+                    id: String(initiator._id),
+                    name: `${initiator.firstName} ${initiator.lastName}`
+                } : { id: 'unknown', name: 'Someone' },
+                participantsCount: channel.activeCall?.participants?.length || 0,
+                type: channel.activeCall?.type || 'video',
+            };
+        });
+
+        res.json(result);
+    } catch (error) {
+        console.error('Error in getActiveCalls:', error);
+        res.status(500).json({ error: 'Failed to fetch active calls' });
     }
 }

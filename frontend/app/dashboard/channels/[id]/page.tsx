@@ -21,7 +21,9 @@ import {
   type ChannelUser,
 } from "../../../../src/api/channels.api";
 import { ChannelVideoCall } from "../../../components/videocalls/ChannelVideoCall";
+import { ChannelVoiceCall } from "../../../components/videocalls/ChannelVoiceCall";
 import { ChannelCallPrompt } from "../../../components/videocalls/ChannelCallPrompt";
+import { videocallsApi } from "../../../../src/api/videocalls.api";
 
 /* ─── Types ─────────────────────────────────────────────────── */
 type Member = ChannelUser;
@@ -267,13 +269,13 @@ export default function ChannelPage() {
   const [callType, setCallType] = useState<'voice' | 'video'>('video');
   const [callStarted, setCallStarted] = useState(false);
   const [callData, setCallData] = useState<{ token: string; url: string; roomName: string; callId?: string } | null>(null);
-  // In-channel call notification: someone started a call while user is on this page
-  const [incomingCallNotice, setIncomingCallNotice] = useState<{ initiatorName: string } | null>(null);
 
   // Auto-open the call UI when navigated from the global incoming call banner (?openCall=1)
   useEffect(() => {
-    if (searchParams.get('openCall') === '1') {
-      setCallType('video');
+    const openCall = searchParams.get('openCall');
+    const type = searchParams.get('type') as 'voice' | 'video';
+    if (openCall === '1') {
+      setCallType(type || 'video');
       setShowVideoCall(true);
     }
   }, [searchParams]);
@@ -365,6 +367,8 @@ export default function ChannelPage() {
     };
     fetchChannelAndHistory();
 
+    // Fetch call info for this channel on mount removed - handled by GlobalIncomingCallBanner
+
     // Fetch all users for inline Add People search
     const fetchAllUsers = async () => {
       try {
@@ -410,24 +414,7 @@ export default function ChannelPage() {
 
       socket.on("channel_presence_updated", handlePresenceUpdated);
 
-      // Show an in-page banner when someone starts a call in this channel
-      // (the global banner handles other pages; this handles the in-channel case)
-      socket.on("channel:call-started", (data: any) => {
-        if (data.channelId === normalizedChannelId) {
-          // Ignore if the current user initiated the call
-          if (currentUser && data.initiator?.id === currentUser._id) return;
-
-          setIncomingCallNotice({ initiatorName: data.initiator?.name || 'Someone' });
-          // Auto-dismiss after 20 seconds
-          setTimeout(() => setIncomingCallNotice(null), 20000);
-        }
-      });
-
-      socket.on("channel:call-ended", (data: any) => {
-        if (data.channelId === normalizedChannelId) {
-          setIncomingCallNotice(null);
-        }
-      });
+      // In-channel call notice logic removed - handled by GlobalIncomingCallBanner
 
       socket.on("user_typing_start", (data: { channelId: string; userId: string }) => {
         if (data.channelId === normalizedChannelId) {
@@ -451,8 +438,6 @@ export default function ChannelPage() {
       if (socket) {
         socket.off("receive_message");
         socket.off("channel_presence_updated", handlePresenceUpdated);
-        socket.off("channel:call-started");
-        socket.off("channel:call-ended");
         socket.off("user_typing_start");
         socket.off("user_typing_stop");
         socket.emit("leave_channel", normalizedChannelId);
@@ -776,55 +761,43 @@ export default function ChannelPage() {
           </div>
         </header>
 
-        {/* In-channel incoming call notice — shown when user is already on this page */}
-        {incomingCallNotice && !showVideoCall && (
-          <div className="flex-none flex items-center justify-between gap-3 px-4 py-2.5 bg-indigo-900/40 border-b border-indigo-700/40 text-sm">
-            <div className="flex items-center gap-2 text-indigo-200">
-              <span className="animate-pulse">📞</span>
-              <span>
-                <span className="font-semibold">{incomingCallNotice.initiatorName}</span> started a call in this channel
-              </span>
-            </div>
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => {
-                  setIncomingCallNotice(null);
-                  setCallType('video');
-                  setShowVideoCall(true);
-                }}
-                className="px-3 py-1 rounded-md bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold transition-colors"
-              >
-                Join
-              </button>
-              <button
-                onClick={() => setIncomingCallNotice(null)}
-                className="text-indigo-400 hover:text-white transition-colors text-xs"
-              >
-                Dismiss
-              </button>
-            </div>
-          </div>
-        )}
 
-        {/* Video call section */}
+
+        {/* Call section (Voice or Video) */}
         {showVideoCall ? (
           <div className="relative flex-1 flex flex-col bg-[var(--bg-canvas)] overflow-hidden">
             {callStarted && callData ? (
               <div className="flex-1 overflow-hidden relative">
-                <ChannelVideoCall
-                  channelId={normalizedChannelId}
-                  channelName={channelName}
-                  callType={callType}
-                  onCallEnd={() => {
-                    setShowVideoCall(false);
-                    setCallStarted(false);
-                    setCallData(null);
-                  }}
-                  token={callData.token}
-                  url={callData.url}
-                  roomName={callData.roomName}
-                  callId={callData.callId}
-                />
+                {callType === 'video' ? (
+                  <ChannelVideoCall
+                    channelId={normalizedChannelId}
+                    channelName={channelName}
+                    onCallEnd={() => {
+                      setShowVideoCall(false);
+                      setCallStarted(false);
+                      setCallData(null);
+                    }}
+                    token={callData.token}
+                    url={callData.url}
+                    roomName={callData.roomName}
+                    callId={callData.callId}
+                    currentUser={currentUser}
+                  />
+                ) : (
+                  <ChannelVoiceCall
+                    channelId={normalizedChannelId}
+                    channelName={channelName}
+                    onCallEnd={() => {
+                      setShowVideoCall(false);
+                      setCallStarted(false);
+                      setCallData(null);
+                    }}
+                    token={callData.token}
+                    url={callData.url}
+                    roomName={callData.roomName}
+                    callId={callData.callId}
+                  />
+                )}
               </div>
             ) : (
               <div className="flex-1 flex items-center justify-center p-4">
@@ -836,7 +809,7 @@ export default function ChannelPage() {
                       setCallData(null);
                     }}
                     className="absolute -top-12 right-0 z-10 p-2 rounded-lg bg-[var(--bg-surface-2)] hover:bg-[var(--bg-surface-3)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors"
-                    title="Close video call"
+                    title={callType === 'video' ? "Close video call" : "Close voice call"}
                   >
                     ✕
                   </button>

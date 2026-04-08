@@ -10,7 +10,9 @@ export interface ChannelDocument extends Document {
     activeCall?: {
         roomName: string;
         startedAt: Date;
+        initiatorId: mongoose.Types.ObjectId;
         participants: mongoose.Types.ObjectId[];
+        type: 'voice' | 'video';
     } | null;
     createdAt: Date;
     updatedAt: Date;
@@ -27,7 +29,9 @@ const channelSchema = new Schema<ChannelDocument>(
         activeCall: {
             roomName: String,
             startedAt: Date,
+            initiatorId: { type: Schema.Types.ObjectId, ref: "users" },
             participants: [{ type: Schema.Types.ObjectId, ref: "users" }],
+            type: { type: String, enum: ['voice', 'video'], default: 'video' },
         },
     },
     {
