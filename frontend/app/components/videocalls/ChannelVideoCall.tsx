@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useRef, useState, useCallback } from 'react';
+import React, { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import {
   GridLayout,
   LiveKitRoom,
@@ -8,6 +8,7 @@ import {
   VideoTrack,
   useTracks,
   useLocalParticipant,
+  useRemoteParticipants,
   useTrackRefContext,
   isTrackReference,
 } from '@livekit/components-react';
@@ -377,20 +378,24 @@ function AppStyledConference({
           </div>
         </div>
 
-        {/* ── VIDEO GRID ── */}
+        {/* ── CALL STAGE ── */}
         <RoomAudioRenderer />
-        <div className="vc-grid-area flex flex-col md:flex-row w-full h-full overflow-hidden">
-          {pinnedTrack && (
-            <div className="flex-1 w-full h-[60%] md:h-full p-2 md:p-4 min-h-[50%]">
-              <CustomParticipantTileInner trackRef={pinnedTrack} />
+        {callType === 'voice' ? (
+          <VoiceAvatarStage />
+        ) : (
+          <div className="vc-grid-area flex flex-col md:flex-row w-full h-full overflow-hidden">
+            {pinnedTrack && (
+              <div className="flex-1 w-full h-[60%] md:h-full p-2 md:p-4 min-h-[50%]">
+                <CustomParticipantTileInner trackRef={pinnedTrack} />
+              </div>
+            )}
+            <div className={`w-full overflow-hidden transition-all ${pinnedTrack ? 'md:w-[280px] h-[40%] md:h-full flex-shrink-0' : 'flex-1 h-full'}`}>
+              <GridLayout tracks={pinnedTrack ? unpinnedTracks : tracks} className="vc-grid">
+                <CustomParticipantTile />
+              </GridLayout>
             </div>
-          )}
-          <div className={`w-full overflow-hidden transition-all ${pinnedTrack ? 'md:w-[280px] h-[40%] md:h-full flex-shrink-0' : 'flex-1 h-full'}`}>
-            <GridLayout tracks={pinnedTrack ? unpinnedTracks : tracks} className="vc-grid">
-              <CustomParticipantTile />
-            </GridLayout>
           </div>
-        </div>
+        )}
 
         {/* ── BOTTOM CONTROLS ── */}
         <div className="vc-bottom-bar">
@@ -398,6 +403,76 @@ function AppStyledConference({
         </div>
       </div>
     </PinnedContext.Provider>
+  );
+}
+
+function getParticipantLabel(participant: any) {
+  const raw = participant?.name || participant?.identity || 'User';
+  if (typeof raw !== 'string') return 'User';
+  if (raw.includes('_')) {
+    const cleaned = raw.split('_').slice(1).join(' ').trim();
+    if (cleaned) return cleaned;
+  }
+  return raw;
+}
+
+function getInitials(name: string) {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (!parts.length) return 'U';
+  return parts.slice(0, 2).map((p) => p.charAt(0).toUpperCase()).join('');
+}
+
+function VoiceAvatarStage() {
+  const { localParticipant } = useLocalParticipant();
+  const remoteParticipants = useRemoteParticipants();
+
+  const participants = useMemo(() => {
+    return [localParticipant, ...remoteParticipants].filter(Boolean);
+  }, [localParticipant, remoteParticipants]);
+
+  const activeParticipant = useMemo(() => {
+    const speakingRemote = remoteParticipants.find((p) => p.isSpeaking);
+    if (speakingRemote) return speakingRemote;
+    if (localParticipant?.isSpeaking) return localParticipant;
+    return remoteParticipants[0] || localParticipant;
+  }, [localParticipant, remoteParticipants]);
+
+  const activeName = getParticipantLabel(activeParticipant);
+  const activeInitial = (activeName || 'U').trim().charAt(0).toUpperCase() || 'U';
+
+  return (
+    <div className="vc-grid-area flex flex-col items-center justify-center px-6 py-8 gap-6">
+      <div className="w-[96px] h-[96px] rounded-[1.25rem] bg-gradient-to-br from-red-500 to-indigo-600 flex items-center justify-center text-white text-[40px] font-bold shadow-[0_20px_50px_rgba(0,0,0,0.4)] shrink-0">
+        {activeInitial}
+      </div>
+
+      <div className="text-center">
+        <div className="text-white text-[18px] font-semibold tracking-wide">
+          {activeName}{activeParticipant?.isLocal ? ' (You)' : ''}
+        </div>
+        <div className="text-white/60 text-[12px] mt-1">
+          {activeParticipant?.isSpeaking ? 'Speaking' : 'Listening'}
+        </div>
+      </div>
+
+      <div className="flex items-center gap-2 flex-wrap justify-center max-w-[680px]">
+        {participants.map((participant) => {
+          const name = getParticipantLabel(participant);
+          const isActive = participant?.identity === activeParticipant?.identity;
+          return (
+            <div
+              key={participant?.identity || name}
+              className={`px-2.5 py-1 rounded-full text-[11px] border ${isActive
+                ? 'bg-white/15 text-white border-white/20'
+                : 'bg-white/5 text-white/75 border-white/10'
+                }`}
+            >
+              {name}{participant?.isLocal ? ' (You)' : ''}
+            </div>
+          );
+        })}
+      </div>
+    </div>
   );
 }
 

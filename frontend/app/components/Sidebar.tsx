@@ -6,6 +6,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import axios from "axios";
 import { authApi } from "../../src/api/auth.api";
 import { channelsApi } from "../../src/api/channels.api";
+import { inboxApi } from "../../src/api/inbox.api";
 import { projectsApi } from "../../src/api/projects.api";
 import { teamsApi } from "../../src/api/teams.api";
 import {
@@ -27,8 +28,6 @@ import {
   UserCircleIcon,
 } from "@heroicons/react/24/outline";
 import { SkeletonSidebarItems } from "./Skeleton";
-import { useCall } from "../providers/CallProvider";
-import { AgentAudioVisualizerRadial } from "@/components/agent-audio-visualizer-radial";
 
 /* ─── Channel member type ───────────────────────────────────── */
 type ChannelMember = { _id: string; firstName: string; lastName: string; email?: string };
@@ -215,21 +214,21 @@ function ContentPanelItem({
   return (
     <div
       className={`flex items-center justify-between px-2 py-1.5 rounded-md transition-all duration-150 group ${active
-        ? "bg-[var(--accent-light)] text-[var(--accent)]"
+        ? "bg-[var(--accent-light)] text-[var(--text-primary)]"
         : "text-[var(--text-secondary)] hover:bg-[var(--bg-surface-2)] hover:text-[var(--text-primary)]"
         } ${href ? "cursor-pointer" : ""}`}
       onClick={handleClick}
     >
       <div className="flex items-center gap-2 overflow-hidden flex-1">
         {icon && (
-          <div className={`flex-shrink-0 ${active ? "text-[var(--accent)]" : "text-[var(--text-muted)] group-hover:text-[var(--text-secondary)]"}`}>
+          <div className={`flex-shrink-0 ${active ? "text-[var(--text-primary)]" : "text-[var(--text-muted)] group-hover:text-[var(--text-secondary)]"}`}>
             {icon}
           </div>
         )}
         <span className="truncate text-[12px] font-medium">{label}</span>
       </div>
       {rightText && (
-        <span className={`text-[11px] flex-shrink-0 ml-1 ${active ? "text-[var(--accent)]" : "text-[var(--text-muted)]"}`}>
+        <span className={`text-[11px] flex-shrink-0 ml-1 ${active ? "text-[var(--text-primary)]" : "text-[var(--text-muted)]"}`}>
           {rightText}
         </span>
       )}
@@ -243,7 +242,6 @@ export default function Sidebar({ userRole }: SidebarProps) {
   const searchParams = useSearchParams();
   const router = useRouter();
   const queryClient = useQueryClient();
-  const { currentAudioTrack } = useCall();
   const [user, setUser] = useState<User | null>(null);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
@@ -321,6 +319,15 @@ export default function Sidebar({ userRole }: SidebarProps) {
     staleTime: 5 * 60 * 1000,
   });
   const teamUsers = teamUsersData?.data || [];
+
+  const { data: inboxUnreadData } = useQuery({
+    queryKey: ["inbox-unread-count"],
+    queryFn: inboxApi.getUnreadCount,
+    enabled: !!userRole,
+    staleTime: 15 * 1000,
+    refetchInterval: 30 * 1000,
+  });
+  const unreadInboxCount = inboxUnreadData?.unreadCount || 0;
 
   const normalizedTeamSearch = teamSearch.trim().toLowerCase();
   const filteredTeams = useMemo(
@@ -618,12 +625,17 @@ export default function Sidebar({ userRole }: SidebarProps) {
 
       {/* Inbox / Quick items */}
       {[
-        { label: "Inbox", href: "/dashboard/inbox", icon: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M22 12h-6l-2 3h-4l-2-3H2" /><path d="M5.45 5.11L2 12v6a2 2 0 002 2h16a2 2 0 002-2v-6l-3.45-6.89A2 2 0 0016.76 4H7.24a2 2 0 00-1.79 1.11z" /></svg> },
+        {
+          label: "Inbox",
+          href: "/dashboard/inbox",
+          icon: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M22 12h-6l-2 3h-4l-2-3H2" /><path d="M5.45 5.11L2 12v6a2 2 0 002 2h16a2 2 0 002-2v-6l-3.45-6.89A2 2 0 0016.76 4H7.24a2 2 0 00-1.79 1.11z" /></svg>,
+          rightText: unreadInboxCount > 0 ? String(unreadInboxCount) : undefined,
+        },
         { label: "Replies", href: "/dashboard", icon: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="9 17 4 12 9 7" /><path d="M20 18v-2a4 4 0 00-4-4H4" /></svg> },
         { label: "Assigned Comments", href: "/dashboard", icon: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z" /></svg> },
         { label: "Tasks", href: "/dashboard/tasks", icon: <ClipboardDocumentListIcon className="w-3.5 h-3.5" /> },
       ].map((item) => (
-        <ContentPanelItem key={item.label} href={item.href} label={item.label} icon={item.icon} active={pathname === item.href && item.href !== "/dashboard"} onNavigate={navigateTo} />
+        <ContentPanelItem key={item.label} href={item.href} label={item.label} rightText={item.rightText} icon={item.icon} active={pathname === item.href && item.href !== "/dashboard"} onNavigate={navigateTo} />
       ))}
 
       <div className="my-2 border-t border-[var(--border-subtle)]" />
@@ -669,7 +681,7 @@ export default function Sidebar({ userRole }: SidebarProps) {
               <div
                 key={channelId || chan.name}
                 className={`flex items-center justify-between px-2 py-1.5 rounded-md transition-all duration-150 group ${isActive
-                  ? "bg-[var(--accent-light)] text-[var(--accent)]"
+                  ? "bg-[var(--accent-light)] text-[var(--text-primary)]"
                   : "text-[var(--text-secondary)] hover:bg-[var(--bg-surface-2)] hover:text-[var(--text-primary)]"
                   }`}
               >
@@ -677,7 +689,7 @@ export default function Sidebar({ userRole }: SidebarProps) {
                   onClick={() => navigateTo(`/dashboard/channels/${channelId}`)}
                   className="flex items-center gap-2 overflow-hidden flex-1 min-w-0 text-left"
                 >
-                  <div className={`flex-shrink-0 ${isActive ? "text-[var(--accent)]" : "text-[var(--text-muted)] group-hover:text-[var(--text-secondary)]"}`}>
+                  <div className={`flex-shrink-0 ${isActive ? "text-[var(--text-primary)]" : "text-[var(--text-muted)] group-hover:text-[var(--text-secondary)]"}`}>
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 9h16 M4 15h16 M10 3L8 21 M16 3l-2 18" /></svg>
                   </div>
                   <span className="truncate text-[12px] font-medium">{chan.name}</span>
@@ -709,7 +721,7 @@ export default function Sidebar({ userRole }: SidebarProps) {
           {visibleChannels.length > CHANNEL_SIDEBAR_LIMIT && (
             <button
               onClick={() => setChannelsExpanded(!channelsExpanded)}
-              className="w-full text-left px-2 py-1.5 text-[11px] font-medium text-[var(--accent)] hover:bg-[var(--bg-surface-2)] rounded-md transition-colors"
+              className="w-full text-left px-2 py-1.5 text-[11px] font-medium text-[var(--text-primary)] hover:bg-[var(--bg-surface-2)] rounded-md transition-colors"
             >
               {channelsExpanded ? "Show less" : " More.."}
             </button>
@@ -721,7 +733,7 @@ export default function Sidebar({ userRole }: SidebarProps) {
             <PlusIcon className="w-3.5 h-3.5 text-[var(--text-tertiary)] group-hover:text-[var(--text-primary)] transition-colors" />
             <span className="text-[12px] text-[var(--text-tertiary)] group-hover:text-[var(--text-primary)] transition-colors">Add Channel</span>
           </button>
-          
+
         </div>
       )}
 
@@ -803,7 +815,7 @@ export default function Sidebar({ userRole }: SidebarProps) {
                       {group.projects.length > PROJECT_SIDEBAR_LIMIT && (
                         <button
                           onClick={() => toggleProjectTeamExpanded(group.id)}
-                          className="w-full text-left px-2 py-1.5 text-[11px] font-medium text-[var(--accent)] hover:bg-[var(--bg-surface-2)] rounded-md transition-colors"
+                          className="w-full text-left px-2 py-1.5 text-[11px] font-medium text-[var(--text-primary)] hover:bg-[var(--bg-surface-2)] rounded-md transition-colors"
                         >
                           {expandedProjectTeams[group.id] ? "Show less" : `More.. (${group.projects.length - PROJECT_SIDEBAR_LIMIT})`}
                         </button>
@@ -909,7 +921,7 @@ export default function Sidebar({ userRole }: SidebarProps) {
           {canToggleMoreTeams && (
             <button
               onClick={() => setShowAllTeams((prev) => !prev)}
-              className="w-full text-left px-2 py-1.5 text-[11px] font-medium text-[var(--accent)] hover:bg-[var(--bg-surface-2)] rounded-md transition-colors"
+              className="w-full text-left px-2 py-1.5 text-[11px] font-medium text-[var(--text-primary)] hover:bg-[var(--bg-surface-2)] rounded-md transition-colors"
             >
               {showAllTeams ? "Show less" : "More.."}
             </button>
@@ -1004,7 +1016,7 @@ export default function Sidebar({ userRole }: SidebarProps) {
                   setIsMobileSidebarOpen(false);
                 }}
                 className={`w-full flex items-center gap-2 px-2.5 py-1.5 rounded-md transition-colors text-[12px] ${(activePanel === item.id || (item.href && pathname === item.href))
-                  ? "bg-[var(--accent-light)] text-[var(--accent)] font-medium"
+                  ? "bg-[var(--accent-light)] text-[var(--text-primary)] font-medium"
                   : "text-[var(--text-secondary)] hover:bg-[var(--bg-surface-2)]"
                   }`}
               >
@@ -1033,7 +1045,7 @@ export default function Sidebar({ userRole }: SidebarProps) {
                     setIsMobileSidebarOpen(false);
                   }}
                   className={`w-full flex items-center gap-2 px-2.5 py-1 rounded-md text-left transition-colors text-[11px] ${isActive
-                    ? "bg-[var(--accent-light)] text-[var(--accent)] font-medium"
+                    ? "bg-[var(--accent-light)] text-[var(--text-primary)] font-medium"
                     : "text-[var(--text-secondary)] hover:bg-[var(--bg-surface-2)]"
                     }`}
                 >
@@ -1159,20 +1171,13 @@ export default function Sidebar({ userRole }: SidebarProps) {
             {/* User avatar */}
             {user && (
               <div className="relative mt-1">
-                <AgentAudioVisualizerRadial 
-                  audioTrack={currentAudioTrack || undefined}
-                  state={currentAudioTrack ? 'speaking' : 'listening'}
-                  size="icon"
-                  color="#6366f1"
+                <div
+                  className="w-7 h-7 rounded-full bg-gray-600 text-white flex items-center justify-center text-[10px] font-bold cursor-pointer hover:ring-2 hover:ring-white/20 transition-all"
+                  title={`${user.firstName} ${user.lastName}`}
+                  onClick={() => setIsDropdownOpen(!isDropdownOpen)}
                 >
-                  <div
-                    className="w-7 h-7 rounded-full bg-gray-600 text-white flex items-center justify-center text-[10px] font-bold cursor-pointer hover:ring-2 hover:ring-white/20 transition-all"
-                    title={`${user.firstName} ${user.lastName}`}
-                    onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-                  >
-                    {user.firstName?.charAt(0)}{user.lastName?.charAt(0)}
-                  </div>
-                </AgentAudioVisualizerRadial>
+                  {user.firstName?.charAt(0)}{user.lastName?.charAt(0)}
+                </div>
               </div>
             )}
           </div>
@@ -1191,16 +1196,9 @@ export default function Sidebar({ userRole }: SidebarProps) {
                   onClick={() => setIsDropdownOpen(!isDropdownOpen)}
                   className="flex items-center gap-2 w-full p-2 rounded-lg hover:bg-[var(--bg-surface-2)] transition-all"
                 >
-                  <AgentAudioVisualizerRadial 
-                    audioTrack={currentAudioTrack || undefined}
-                    state={currentAudioTrack ? 'speaking' : 'listening'}
-                    size="icon"
-                    color="#6366f1"
-                  >
-                    <div className="flex h-6 w-6 items-center justify-center rounded-full bg-gray-700 text-white text-[9px] font-bold flex-shrink-0">
-                      {user.firstName?.charAt(0)}{user.lastName?.charAt(0)}
-                    </div>
-                  </AgentAudioVisualizerRadial>
+                  <div className="flex h-6 w-6 items-center justify-center rounded-full bg-gray-700 text-white text-[9px] font-bold flex-shrink-0">
+                    {user.firstName?.charAt(0)}{user.lastName?.charAt(0)}
+                  </div>
                   <div className="flex-1 text-left overflow-hidden">
                     <p className="text-[11px] font-medium text-[var(--text-primary)] truncate">{user.firstName} {user.lastName}</p>
                     <p className="text-[10px] text-[var(--text-muted)] truncate">{user.email}</p>

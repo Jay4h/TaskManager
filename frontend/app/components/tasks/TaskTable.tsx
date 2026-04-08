@@ -809,17 +809,17 @@ export default function TaskTable({ initialFilter, projectFilter, assignedToFilt
             const config = groupConfigs[key];
 
             return (
-                <div
-                  key={key}
-                  onDragOver={(e) => handleStatusDragOver(e, key)}
-                  onDrop={(e) => handleStatusDrop(e, key)}
-                  onDragLeave={() => {
-                    if (dragOverStatus === key) {
-                      setDragOverStatus(null);
-                    }
-                  }}
-                  className={`flex-none w-[280px] sm:w-[320px] bg-[var(--bg-surface-2)] border rounded-xl flex flex-col max-h-[calc(100dvh-200px)] sm:max-h-[calc(100vh-220px)] shadow-sm snap-start transition-colors ${dragOverStatus === key ? "border-[var(--accent)]" : "border-[var(--border-subtle)]"}`}
-                >
+              <div
+                key={key}
+                onDragOver={(e) => handleStatusDragOver(e, key)}
+                onDrop={(e) => handleStatusDrop(e, key)}
+                onDragLeave={() => {
+                  if (dragOverStatus === key) {
+                    setDragOverStatus(null);
+                  }
+                }}
+                className={`flex-none w-[280px] sm:w-[320px] bg-[var(--bg-surface-2)] border rounded-xl flex flex-col max-h-[calc(100dvh-200px)] sm:max-h-[calc(100vh-220px)] shadow-sm snap-start transition-colors ${dragOverStatus === key ? "border-[var(--accent)]" : "border-[var(--border-subtle)]"}`}
+              >
                 <div className="px-3 py-3 flex items-center justify-between border-b border-[var(--border-subtle)] bg-[var(--bg-canvas)] rounded-t-xl">
                   <div className="flex items-center gap-2">
                     <div className={`px-2 py-0.5 rounded-md text-[10px] font-bold tracking-wider ${config.bgColor} ${config.textColor}`}>
@@ -952,6 +952,18 @@ export default function TaskTable({ initialFilter, projectFilter, assignedToFilt
                       </svg>
                     </div>
                     <p className="text-[var(--text-tertiary)]">No tasks yet</p>
+                    {!readOnly && (
+                      <button
+                        onClick={() => startInlineAdd("to-do")}
+                        className="mt-4 inline-flex items-center gap-2 px-3 py-1.5 rounded-md border border-[var(--border-subtle)] text-[12px] font-medium text-[var(--text-primary)] hover:bg-[var(--bg-surface)] transition-colors"
+                      >
+                        <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <line x1="12" y1="5" x2="12" y2="19" />
+                          <line x1="5" y1="12" x2="19" y2="12" />
+                        </svg>
+                        Create first task
+                      </button>
+                    )}
                   </div>
                 ) : groupByStatus ? (
                   groupOrder.map((key) => {
@@ -1345,8 +1357,8 @@ export default function TaskTable({ initialFilter, projectFilter, assignedToFilt
                             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#b0b0b0" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" strokeDasharray="2 4">
                               <circle cx="12" cy="12" r="9" />
                             </svg>
-                           
-                            
+
+
                           </div>
 
                           {/* Hours/Minutes Input */}

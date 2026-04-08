@@ -539,8 +539,8 @@ export async function getUserCallStats(req: Request, res: Response): Promise<voi
 export async function getActiveCalls(_req: Request, res: Response): Promise<void> {
     try {
         // Find channels with an active call. $ne: null works for non-existent values too.
-        const activeChannels = await ChannelModel.find({ 
-            'activeCall.roomName': { $exists: true, $ne: null } 
+        const activeChannels = await ChannelModel.find({
+            'activeCall.roomName': { $exists: true, $ne: null }
         }).lean();
 
         if (activeChannels.length === 0) {
@@ -564,8 +564,8 @@ export async function getActiveCalls(_req: Request, res: Response): Promise<void
 
         // Transform into a frontend-friendly format
         const result = activeChannels.map(channel => {
-            const initiator = channel.activeCall?.initiatorId 
-                ? userMap.get(String(channel.activeCall.initiatorId)) 
+            const initiator = channel.activeCall?.initiatorId
+                ? userMap.get(String(channel.activeCall.initiatorId))
                 : null;
 
             return {
