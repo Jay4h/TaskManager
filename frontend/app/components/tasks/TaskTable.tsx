@@ -1345,16 +1345,8 @@ export default function TaskTable({ initialFilter, projectFilter, assignedToFilt
                             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#b0b0b0" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" strokeDasharray="2 4">
                               <circle cx="12" cy="12" r="9" />
                             </svg>
-                            <input
-                              ref={newTaskInputRef}
-                              type="text"
-                              value={newTaskName}
-                              onChange={(e) => setNewTaskName(e.target.value)}
-                              onKeyDown={handleInlineKeyDown}
-                              placeholder="Task name"
-                              disabled={isCreating}
-                              className="flex-1 bg-transparent outline-none text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-muted)] border border-[var(--border-subtle)] rounded-md px-2 py-1"
-                            />
+                           
+                            
                           </div>
 
                           {/* Hours/Minutes Input */}
@@ -2068,3 +2060,4 @@ function TaskRow({ task, expandedTaskId, setExpandedTaskId, formatDueDate, isDue
     </>
   );
 }
+

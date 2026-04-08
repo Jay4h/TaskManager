@@ -270,15 +270,42 @@ export default function ChannelPage() {
   const [callStarted, setCallStarted] = useState(false);
   const [callData, setCallData] = useState<{ token: string; url: string; roomName: string; callId?: string } | null>(null);
 
+  // Launch a call directly — start if none active, join if one is running
+  const [callLaunching, setCallLaunching] = useState(false);
+  const handleLaunchCall = useCallback(async (type: 'voice' | 'video') => {
+    try {
+      setCallLaunching(true);
+      setCallType(type);
+      setShowVideoCall(true);
+
+      // Check if there's already an active call to join
+      const info = await videocallsApi.getCallInfo(normalizedChannelId);
+      let data;
+      if (info.hasActiveCall) {
+        data = await videocallsApi.joinCall(normalizedChannelId);
+      } else {
+        data = await videocallsApi.startCall(normalizedChannelId, false);
+      }
+      setCallData({ token: data.token, url: data.url, roomName: data.roomName, callId: data.callId });
+      setCallStarted(true);
+    } catch (err) {
+      console.error('Failed to launch call:', err);
+      // Fall back to showing the lobby prompt so the user can retry
+      setCallStarted(false);
+      setCallData(null);
+    } finally {
+      setCallLaunching(false);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [normalizedChannelId]);
+
   // Auto-open the call UI when navigated from the global incoming call banner (?openCall=1)
   useEffect(() => {
-    const openCall = searchParams.get('openCall');
-    const type = searchParams.get('type') as 'voice' | 'video';
-    if (openCall === '1') {
-      setCallType(type || 'video');
-      setShowVideoCall(true);
+    if (searchParams.get('openCall') === '1') {
+      handleLaunchCall('video');
     }
-  }, [searchParams]);
+  }, [searchParams, handleLaunchCall]);
+
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -737,18 +764,28 @@ export default function ChannelPage() {
           </div>
           <div className="flex items-center gap-1.5">
             <button
-              onClick={() => { setCallType('voice'); setShowVideoCall(!showVideoCall); }}
-              className="p-2 rounded-lg hover:bg-[var(--bg-surface-2)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors"
+              onClick={() => { if (!showVideoCall) handleLaunchCall('voice'); else { setShowVideoCall(false); setCallStarted(false); setCallData(null); } }}
+              disabled={callLaunching}
+              className={`p-2 rounded-lg transition-colors ${showVideoCall && callType === 'voice'
+                  ? 'bg-[var(--ck-blue)]/10 text-[var(--ck-blue)]'
+                  : 'hover:bg-[var(--bg-surface-2)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+                }`}
               title="Voice Call"
             >
               <PhoneIcon className="w-4 h-4" />
             </button>
             <button
-              onClick={() => { setCallType('video'); setShowVideoCall(!showVideoCall); }}
-              className="p-2 rounded-lg hover:bg-[var(--bg-surface-2)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors"
+              onClick={() => { if (!showVideoCall) handleLaunchCall('video'); else { setShowVideoCall(false); setCallStarted(false); setCallData(null); } }}
+              disabled={callLaunching}
+              className={`p-2 rounded-lg transition-colors ${showVideoCall && callType === 'video'
+                  ? 'bg-[var(--ck-blue)]/10 text-[var(--ck-blue)]'
+                  : 'hover:bg-[var(--bg-surface-2)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+                }`}
               title="Video Call"
             >
-              <VideoCameraIcon className="w-4 h-4" />
+              {callLaunching
+                ? <span className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin block" />
+                : <VideoCameraIcon className="w-4 h-4" />}
             </button>
             <div className="w-px h-5 bg-[var(--border-subtle)] mx-1" />
             <button
@@ -761,58 +798,103 @@ export default function ChannelPage() {
           </div>
         </header>
 
+        {/* In-channel incoming call notice — matches app design system */}
+        {incomingCallNotice && !showVideoCall && (
+          <div
+            className="flex-none flex items-center justify-between gap-3 px-5 py-2.5 border-b border-[var(--border-subtle)] bg-[var(--bg-surface)]"
+          >
+            <div className="flex items-center gap-2.5">
+              {/* Pulsing icon */}
+              <div className="w-7 h-7 rounded-full bg-[var(--bg-surface-2)] border border-[var(--border-default)] flex items-center justify-center flex-shrink-0">
+                <svg viewBox="0 0 24 24" fill="currentColor" className="w-3.5 h-3.5 text-[var(--ck-blue)]">
+                  <path d="M17 10.5V7a1 1 0 0 0-1-1H4a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-3.5l4 4v-11l-4 4z" />
+                </svg>
+              </div>
+              <div>
+                <span className="text-[13px] font-semibold text-[var(--text-primary)]">
+                  {incomingCallNotice.initiatorName}
+                </span>
+                <span className="text-[13px] text-[var(--text-secondary)] ml-1">
+                  started a call in this channel
+                </span>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => {
+                  setIncomingCallNotice(null);
+                  setCallType('video');
+                  setShowVideoCall(true);
+                }}
+                className="px-3 py-1.5 rounded-md bg-[var(--ck-blue)] hover:opacity-90 text-white text-[12px] font-medium transition-opacity"
+              >
+                Join Call
+              </button>
+              <button
+                onClick={() => setIncomingCallNotice(null)}
+                className="px-3 py-1.5 rounded-md border border-[var(--border-subtle)] hover:bg-[var(--bg-surface-2)] text-[var(--text-secondary)] text-[12px] font-medium transition-colors"
+              >
+                Dismiss
+              </button>
+            </div>
+          </div>
+        )}
 
 
         {/* Call section (Voice or Video) */}
         {showVideoCall ? (
-          <div className="relative flex-1 flex flex-col bg-[var(--bg-canvas)] overflow-hidden">
+          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', background: '#0a0c10', overflow: 'hidden', position: 'relative' }}>
             {callStarted && callData ? (
-              <div className="flex-1 overflow-hidden relative">
-                {callType === 'video' ? (
-                  <ChannelVideoCall
-                    channelId={normalizedChannelId}
-                    channelName={channelName}
-                    onCallEnd={() => {
-                      setShowVideoCall(false);
-                      setCallStarted(false);
-                      setCallData(null);
-                    }}
-                    token={callData.token}
-                    url={callData.url}
-                    roomName={callData.roomName}
-                    callId={callData.callId}
-                    currentUser={currentUser}
-                  />
-                ) : (
-                  <ChannelVoiceCall
-                    channelId={normalizedChannelId}
-                    channelName={channelName}
-                    onCallEnd={() => {
-                      setShowVideoCall(false);
-                      setCallStarted(false);
-                      setCallData(null);
-                    }}
-                    token={callData.token}
-                    url={callData.url}
-                    roomName={callData.roomName}
-                    callId={callData.callId}
-                  />
-                )}
+              <div style={{ flex: 1, overflow: 'hidden', position: 'relative' }}>
+                <ChannelVideoCall
+                  channelId={normalizedChannelId}
+                  channelName={channelName}
+                  callType={callType}
+                  onCallEnd={() => {
+                    setShowVideoCall(false);
+                    setCallStarted(false);
+                    setCallData(null);
+                  }}
+                  token={callData.token}
+                  url={callData.url}
+                  roomName={callData.roomName}
+                  callId={callData.callId}
+                />
               </div>
             ) : (
-              <div className="flex-1 flex items-center justify-center p-4">
-                <div className="w-full max-w-2xl relative">
+              <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+                {/* Close button row */}
+                <div style={{
+                  display: 'flex', justifyContent: 'flex-end',
+                  padding: '12px 16px 0',
+                  flexShrink: 0,
+                }}>
                   <button
                     onClick={() => {
                       setShowVideoCall(false);
                       setCallStarted(false);
                       setCallData(null);
                     }}
-                    className="absolute -top-12 right-0 z-10 p-2 rounded-lg bg-[var(--bg-surface-2)] hover:bg-[var(--bg-surface-3)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors"
-                    title={callType === 'video' ? "Close video call" : "Close voice call"}
+                    style={{
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      width: 34, height: 34, borderRadius: '50%',
+                      border: '1px solid rgba(255,255,255,0.1)',
+                      background: 'rgba(255,255,255,0.06)',
+                      color: 'rgba(255,255,255,0.6)',
+                      cursor: 'pointer',
+                      backdropFilter: 'blur(8px)',
+                      transition: 'all 0.2s',
+                    }}
+                    title="Close video call"
                   >
-                    ✕
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" style={{ width: 14, height: 14 }}>
+                      <line x1="18" y1="6" x2="6" y2="18" />
+                      <line x1="6" y1="6" x2="18" y2="18" />
+                    </svg>
                   </button>
+                </div>
+                {/* Call lobby */}
+                <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px 24px 24px' }}>
                   <ChannelCallPrompt
                     channelId={normalizedChannelId}
                     channelName={channelName}
