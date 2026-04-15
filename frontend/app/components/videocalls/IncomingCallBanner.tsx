@@ -1,8 +1,9 @@
 'use client';
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation';
 import { useSocket } from '../../providers/SocketProvider';
+import { videocallsApi } from '../../../src/api/videocalls.api';
 
 interface IncomingCall {
   callId: string;
@@ -14,6 +15,7 @@ interface IncomingCall {
     name: string;
   };
   startedAt: string;
+  type: 'voice' | 'video';
   recordingEnabled?: boolean;
 }
 
@@ -32,6 +34,7 @@ interface IncomingCall {
 export function GlobalIncomingCallBanner() {
   const { socket, isConnected } = useSocket();
   const router = useRouter();
+  const pathname = usePathname();
   const [calls, setCalls] = useState<IncomingCall[]>([]);
   const dismissTimers = useRef<Record<string, NodeJS.Timeout>>({});
 
@@ -46,11 +49,54 @@ export function GlobalIncomingCallBanner() {
   const handleJoin = useCallback(
     (call: IncomingCall) => {
       dismiss(call.channelId);
-      // Navigate to the channel page with openCall=1 so the call UI auto-opens
-      router.push(`/dashboard/channels/${call.channelId}?openCall=1`);
+      // Navigate to the channel page with openCall=1 and type
+      router.push(`/dashboard/channels/${call.channelId}?openCall=1&type=${call.type}`);
     },
     [dismiss, router]
   );
+
+  // Fetch all active calls on mount for persistence across refreshes
+  useEffect(() => {
+    if (!isConnected) return;
+
+    const fetchActiveCalls = async () => {
+      try {
+        const activeCalls = await videocallsApi.getActiveCalls();
+
+        // Get current user ID to avoid showing banner for own calls
+        let currentUserId = null;
+        try {
+          const userJson = typeof window !== 'undefined' ? localStorage.getItem('user') : null;
+          if (userJson) {
+            currentUserId = JSON.parse(userJson).userId;
+          }
+        } catch (e) {}
+
+        const formatted = activeCalls
+          .filter(ac => !currentUserId || ac.initiator.id !== currentUserId)
+          .map(ac => ({
+            callId: '', // Placeholder as we join by channel/room mainly
+            channelId: ac.channelId,
+            channelName: ac.channelName,
+            roomName: ac.roomName,
+            initiator: ac.initiator,
+            startedAt: ac.startedAt,
+            type: ac.type || 'video',
+          }));
+
+        setCalls(prev => {
+          // Merge with existing calls from socket events, avoiding duplicates
+          const existingIds = new Set(prev.map(c => c.channelId));
+          const newCalls = formatted.filter(ac => !existingIds.has(ac.channelId));
+          return [...prev, ...newCalls];
+        });
+      } catch (err) {
+        console.error('❌ Failed to fetch active calls on mount:', err);
+      }
+    };
+
+    fetchActiveCalls();
+  }, [isConnected]);
 
   useEffect(() => {
     if (!socket || !isConnected) return;
@@ -61,6 +107,7 @@ export function GlobalIncomingCallBanner() {
       roomName: string;
       initiator: { id: string; name: string };
       startedAt: string;
+      type: 'voice' | 'video';
       recordingEnabled?: boolean;
     }) => {
       // Don't show banner if the current user initiated the call
@@ -94,14 +141,17 @@ export function GlobalIncomingCallBanner() {
           roomName: data.roomName,
           initiator: data.initiator,
           startedAt: data.startedAt,
+          type: data.type || 'video',
           recordingEnabled: data.recordingEnabled,
         };
 
-        // Auto-dismiss after 30 seconds
+        /* 
+        // Auto-dismiss after 30 seconds - disabled for persistence
         dismissTimers.current[data.channelId] = setTimeout(() => {
           setCalls((p) => p.filter((c) => c.channelId !== data.channelId));
           delete dismissTimers.current[data.channelId];
-        }, 30000);
+        }, 30000); 
+        */
 
         return [...prev, newCall];
       });
@@ -128,11 +178,17 @@ export function GlobalIncomingCallBanner() {
     };
   }, []);
 
-  if (calls.length === 0) return null;
+  // Extract current channel from pathname (e.g., /dashboard/channels/general -> general)
+  const currentChannelId = pathname?.split('/').pop()?.toLowerCase() || '';
+
+  // Filter calls to only show the one for the current channel
+  const filteredCalls = calls.filter((c) => c.channelId.toLowerCase() === currentChannelId);
+
+  if (filteredCalls.length === 0) return null;
 
   return (
     <div className="fixed bottom-6 right-6 z-[9999] flex flex-col gap-3 pointer-events-none">
-      {calls.map((call) => (
+      {filteredCalls.map((call) => (
         <CallNotification
           key={call.channelId}
           call={call}
@@ -168,19 +224,18 @@ function CallNotification({
         <div className="flex items-center gap-3">
           {/* Animated ring icon */}
           <div className="relative flex-shrink-0">
-            <div className="w-10 h-10 rounded-full bg-indigo-500/20 flex items-center justify-center">
-              <span className="text-xl">📞</span>
+            <div className={`w-10 h-10 rounded-full ${call.type === 'voice' ? 'bg-indigo-500/20' : 'bg-rose-500/20'} flex items-center justify-center`}>
+              <span className="text-xl">{call.type === 'voice' ? '📞' : '📹'}</span>
             </div>
-            <span className="absolute -top-1 -right-1 w-3 h-3 bg-green-400 rounded-full border-2 border-slate-900 animate-pulse" />
+            <span className={`absolute -top-1 -right-1 w-3 h-3 ${call.type === 'voice' ? 'bg-green-400' : 'bg-red-400'} rounded-full border-2 border-slate-900 animate-pulse`} />
           </div>
           {/* Info */}
           <div>
             <p className="text-[13px] font-semibold text-white leading-tight">
-              Incoming call
+              Incoming {call.type === 'voice' ? 'voice' : 'video'} call
             </p>
             <p className="text-[11px] text-slate-400 mt-0.5">
-              <span className="text-indigo-300 font-medium">{call.initiator.name}</span> started a call in{' '}
-              <span className="text-white font-medium">#{call.channelName}</span>
+              <span className="text-indigo-300 font-medium">{call.initiator.name}</span> started a {call.type} call
             </p>
           </div>
         </div>

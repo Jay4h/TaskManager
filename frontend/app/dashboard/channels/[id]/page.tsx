@@ -2,16 +2,7 @@
 
 import React, { useEffect, useState, useRef, useCallback, useMemo } from "react";
 import { useParams, useSearchParams } from "next/navigation";
-import {
-  PhoneIcon,
-  VideoCameraIcon,
-  PlusIcon,
-  PaperClipIcon,
-  FaceSmileIcon,
-  HashtagIcon,
-  UserGroupIcon,
-  ChevronRightIcon,
-} from "@heroicons/react/24/outline";
+
 import { useSocket } from "../../../providers/SocketProvider";
 import {
   channelsApi,
@@ -20,9 +11,28 @@ import {
   type ChannelMessage,
   type ChannelUser,
 } from "../../../../src/api/channels.api";
-import { integrationsApi } from "../../../../src/api/integrations.api";
 import { ChannelVideoCall } from "../../../components/videocalls/ChannelVideoCall";
+import { ChannelVoiceCall } from "../../../components/videocalls/ChannelVoiceCall";
 import { ChannelCallPrompt } from "../../../components/videocalls/ChannelCallPrompt";
+import { videocallsApi } from "../../../../src/api/videocalls.api";
+import {
+  HashtagIcon,
+  UserGroupIcon,
+  MagnifyingGlassIcon,
+  BellIcon,
+  VideoCameraIcon,
+  PhoneIcon,
+  ChatBubbleBottomCenterTextIcon as ChatBubbleLeftRightIcon, 
+  ChevronRightIcon,
+  Squares2X2Icon,
+  PaperAirplaneIcon,
+  FaceSmileIcon,
+  PlusIcon,
+  Cog6ToothIcon,
+  EllipsisVerticalIcon,
+  MagnifyingGlassIcon as SearchIcon,
+  MicrophoneIcon,
+} from "@heroicons/react/24/outline";
 
 /* ─── Types ─────────────────────────────────────────────────── */
 type Member = ChannelUser;
@@ -268,13 +278,13 @@ export default function ChannelPage() {
   const [callType, setCallType] = useState<'voice' | 'video'>('video');
   const [callStarted, setCallStarted] = useState(false);
   const [callData, setCallData] = useState<{ token: string; url: string; roomName: string; callId?: string } | null>(null);
-  // In-channel call notification: someone started a call while user is on this page
-  const [incomingCallNotice, setIncomingCallNotice] = useState<{ initiatorName: string } | null>(null);
 
   // Auto-open the call UI when navigated from the global incoming call banner (?openCall=1)
   useEffect(() => {
-    if (searchParams.get('openCall') === '1') {
-      setCallType('video');
+    const openCall = searchParams.get('openCall');
+    const type = searchParams.get('type') as 'voice' | 'video';
+    if (openCall === '1') {
+      setCallType(type || 'video');
       setShowVideoCall(true);
     }
   }, [searchParams]);
@@ -284,53 +294,10 @@ export default function ChannelPage() {
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const [typingUsers, setTypingUsers] = useState<Set<string>>(new Set());
   const memberSearchRef = useRef<HTMLInputElement>(null);
-
-  const [isSlackImporting, setIsSlackImporting] = useState(false);
-  const [slackConnected, setSlackConnected] = useState(false);
-  const [slackOAuthUrl, setSlackOAuthUrl] = useState<string | null>(null);
-  const [availableSlackChannels, setAvailableSlackChannels] = useState<{ id: string, name: string }[]>([]);
-  const [selectedSlackChannel, setSelectedSlackChannel] = useState<string>('');
-  const [importedSlackChannel, setImportedSlackChannel] = useState<{ id: string, name: string } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toasts, add: addToast, remove: removeToast } = useToast();
 
   const quickEmojis = ["😀", "😂", "😍", "🔥", "👍", "🎉", "✅", "🙏", "👀", "🤝", "❤️", "🚀"];
-
-  // Slack API Integration setup
-  const checkSlackAuth = async () => {
-    try {
-      const res = await integrationsApi.getSlackChannels();
-      setSlackConnected(true);
-      setAvailableSlackChannels(res.channels);
-      addToast("Slack connected successfully!", "success");
-    } catch (err: any) {
-      if (err.response?.status === 401) {
-        setSlackConnected(false);
-        try {
-          const authRes = await integrationsApi.getSlackAuthUrl();
-          setSlackOAuthUrl(authRes.url);
-        } catch (e) {
-          console.error("Failed to get Slack auth URL:", e);
-        }
-      } else {
-        console.error("Failed to check Slack auth:", err);
-      }
-    }
-  };
-
-  useEffect(() => {
-    checkSlackAuth();
-
-    const handleMessage = (event: MessageEvent) => {
-      console.log("Message received:", event.data);
-      if (event.data === 'slack-auth-success') {
-        console.log("Slack auth success message received, refreshing...");
-        checkSlackAuth();
-      }
-    };
-    window.addEventListener('message', handleMessage);
-    return () => window.removeEventListener('message', handleMessage);
-  }, []);
 
   /* ---------- scroll to bottom ---------- */
   const scrollToBottom = useCallback(() => {
@@ -409,6 +376,8 @@ export default function ChannelPage() {
     };
     fetchChannelAndHistory();
 
+    // Fetch call info for this channel on mount removed - handled by GlobalIncomingCallBanner
+
     // Fetch all users for inline Add People search
     const fetchAllUsers = async () => {
       try {
@@ -450,59 +419,11 @@ export default function ChannelPage() {
         });
       });
 
-      socket.on("slack_import_progress", (data: any) => {
-        console.log('[slack_import_progress]', data);
-        if (data.status === 'started') {
-            addToast("Slack import started...", "info");
-            setIsSlackImporting(true);
-        } else if (data.status === 'processing') {
-            setIsSlackImporting(true);
-        } else if (data.status === 'completed') {
-            addToast(`Import complete! Loaded ${data.totalImported} messages.`, "success");
-            setIsSlackImporting(false);
-        } else if (data.status === 'error') {
-            addToast(`Import failed: ${data.error}`, "error");
-            setIsSlackImporting(false);
-        }
-      });
 
-      socket.on("channel_logs_updated", async (data: any) => {
-        console.log('[channel_logs_updated] Received event, fetching messages...', data);
-        try {
-            console.log(`[channel_logs_updated] Fetching messages for channel: ${normalizedChannelId}`);
-            const history = await channelsApi.getMessages(normalizedChannelId);
-            console.log(`[channel_logs_updated] Got ${history.length} messages`);
-            setMessages(history as Message[]);
-            // Keep the imported channel banner visible for feedback
-            // Don't clear it immediately - user will see the banner showing what was imported
-            addToast(`Imported messages loaded!`, "success");
-        } catch(e) {
-            console.error('[channel_logs_updated] Failed to fetch messages:', e);
-            addToast(`Failed to load imported messages`, "error");
-            setImportedSlackChannel(null);
-        }
-      });
 
       socket.on("channel_presence_updated", handlePresenceUpdated);
 
-      // Show an in-page banner when someone starts a call in this channel
-      // (the global banner handles other pages; this handles the in-channel case)
-      socket.on("channel:call-started", (data: any) => {
-        if (data.channelId === normalizedChannelId) {
-          // Ignore if the current user initiated the call
-          if (currentUser && data.initiator?.id === currentUser._id) return;
-
-          setIncomingCallNotice({ initiatorName: data.initiator?.name || 'Someone' });
-          // Auto-dismiss after 20 seconds
-          setTimeout(() => setIncomingCallNotice(null), 20000);
-        }
-      });
-
-      socket.on("channel:call-ended", (data: any) => {
-        if (data.channelId === normalizedChannelId) {
-          setIncomingCallNotice(null);
-        }
-      });
+      // In-channel call notice logic removed - handled by GlobalIncomingCallBanner
 
       socket.on("user_typing_start", (data: { channelId: string; userId: string }) => {
         if (data.channelId === normalizedChannelId) {
@@ -525,11 +446,7 @@ export default function ChannelPage() {
       mounted = false;
       if (socket) {
         socket.off("receive_message");
-        socket.off("slack_import_progress");
-        socket.off("channel_logs_updated");
         socket.off("channel_presence_updated", handlePresenceUpdated);
-        socket.off("channel:call-started");
-        socket.off("channel:call-ended");
         socket.off("user_typing_start");
         socket.off("user_typing_stop");
         socket.emit("leave_channel", normalizedChannelId);
@@ -662,31 +579,7 @@ export default function ChannelPage() {
     }
   };
 
-  const handleSlackImport = async () => {
-    if (!selectedSlackChannel) {
-      addToast("Please select a Slack channel to import", "error");
-      return;
-    }
-    
-    setIsSlackImporting(true);
 
-    try {
-      addToast("Starting Slack import...", "info");
-      // Find the channel name from available channels
-      const selectedChannel = availableSlackChannels.find(ch => ch.id === selectedSlackChannel);
-      if (selectedChannel) {
-        setImportedSlackChannel(selectedChannel);
-      }
-      await integrationsApi.importSlackChannel(normalizedChannelId, selectedSlackChannel);
-      addToast("Import started! Processing messages...", "success");
-    } catch (error: any) {
-      console.error("Slack import error:", error);
-      addToast("Failed to start Slack import", "error");
-      setImportedSlackChannel(null);
-    } finally {
-      setIsSlackImporting(false);
-    }
-  };
 
   const removePendingAttachment = (index: number) => {
     setPendingAttachments((prev) => prev.filter((_, i) => i !== index));
@@ -833,7 +726,7 @@ export default function ChannelPage() {
   const messageGroups = groupMessages(messages, currentUser?._id ?? "");
 
   return (
-    <div className="flex h-screen overflow-hidden bg-[var(--bg-canvas)] text-[var(--text-primary)]">
+    <div className="flex h-full overflow-hidden bg-[var(--bg-canvas)] text-[var(--text-primary)]">
       {/* ── MAIN CHAT COLUMN ── */}
       <div className="flex-1 flex flex-col min-w-0">
 
@@ -864,7 +757,7 @@ export default function ChannelPage() {
               className="p-2 rounded-lg hover:bg-[var(--bg-surface-2)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors"
               title="Video Call"
             >
-              <VideoCameraIcon className="w-4 h-4" />
+              <VideoCameraIcon className="w-4.5 h-4.5" />
             </button>
             <div className="w-px h-5 bg-[var(--border-subtle)] mx-1" />
             <button
@@ -872,60 +765,48 @@ export default function ChannelPage() {
               className={`p-2 rounded-lg transition-colors ${membersOpen ? "bg-indigo-500/10 text-indigo-500" : "hover:bg-[var(--bg-surface-2)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]"}`}
               title="Toggle member list"
             >
-              <UserGroupIcon className="w-4 h-4" />
+              <i className="pi pi-users text-[18px] w-4 h-4" ></i>
             </button>
           </div>
         </header>
 
-        {/* In-channel incoming call notice — shown when user is already on this page */}
-        {incomingCallNotice && !showVideoCall && (
-          <div className="flex-none flex items-center justify-between gap-3 px-4 py-2.5 bg-indigo-900/40 border-b border-indigo-700/40 text-sm">
-            <div className="flex items-center gap-2 text-indigo-200">
-              <span className="animate-pulse">📞</span>
-              <span>
-                <span className="font-semibold">{incomingCallNotice.initiatorName}</span> started a call in this channel
-              </span>
-            </div>
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => {
-                  setIncomingCallNotice(null);
-                  setCallType('video');
-                  setShowVideoCall(true);
-                }}
-                className="px-3 py-1 rounded-md bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold transition-colors"
-              >
-                Join
-              </button>
-              <button
-                onClick={() => setIncomingCallNotice(null)}
-                className="text-indigo-400 hover:text-white transition-colors text-xs"
-              >
-                Dismiss
-              </button>
-            </div>
-          </div>
-        )}
 
-        {/* Video call section */}
+
+        {/* Call section (Voice or Video) */}
         {showVideoCall ? (
           <div className="relative flex-1 flex flex-col bg-[var(--bg-canvas)] overflow-hidden">
             {callStarted && callData ? (
               <div className="flex-1 overflow-hidden relative">
-                <ChannelVideoCall
-                  channelId={normalizedChannelId}
-                  channelName={channelName}
-                  callType={callType}
-                  onCallEnd={() => {
-                    setShowVideoCall(false);
-                    setCallStarted(false);
-                    setCallData(null);
-                  }}
-                  token={callData.token}
-                  url={callData.url}
-                  roomName={callData.roomName}
-                  callId={callData.callId}
-                />
+                {callType === 'video' ? (
+                  <ChannelVideoCall
+                    channelId={normalizedChannelId}
+                    channelName={channelName}
+                    onCallEnd={() => {
+                      setShowVideoCall(false);
+                      setCallStarted(false);
+                      setCallData(null);
+                    }}
+                    token={callData.token}
+                    url={callData.url}
+                    roomName={callData.roomName}
+                    callId={callData.callId}
+                    currentUser={currentUser}
+                  />
+                ) : (
+                  <ChannelVoiceCall
+                    channelId={normalizedChannelId}
+                    channelName={channelName}
+                    onCallEnd={() => {
+                      setShowVideoCall(false);
+                      setCallStarted(false);
+                      setCallData(null);
+                    }}
+                    token={callData.token}
+                    url={callData.url}
+                    roomName={callData.roomName}
+                    callId={callData.callId}
+                  />
+                )}
               </div>
             ) : (
               <div className="flex-1 flex items-center justify-center p-4">
@@ -937,7 +818,7 @@ export default function ChannelPage() {
                       setCallData(null);
                     }}
                     className="absolute -top-12 right-0 z-10 p-2 rounded-lg bg-[var(--bg-surface-2)] hover:bg-[var(--bg-surface-3)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors"
-                    title="Close video call"
+                    title={callType === 'video' ? "Close video call" : "Close voice call"}
                   >
                     ✕
                   </button>
@@ -963,24 +844,6 @@ export default function ChannelPage() {
 
         {/* Messages area */}
         <div className={`flex-1 overflow-y-auto px-0 py-0 space-y-0 ck-scrollbar ${showVideoCall ? 'hidden' : ''}`} id="messages-container">
-          {/* Slack Import Banner */}
-          {importedSlackChannel && messages.length > 0 && (
-            <div className="sticky top-0 z-10 bg-gradient-to-r from-[#E01E5A]/10 to-[#E01E5A]/5 border-b border-[#E01E5A]/30 px-5 py-3 text-center">
-              <div className="flex items-center justify-center gap-2 text-[13px] text-[#E01E5A] font-medium">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-                  <path d="M5.042 15.165a2.528 2.528 0 0 1-2.52 2.523A2.528 2.528 0 0 1 0 15.165a2.527 2.527 0 0 1 2.522-2.52h2.52v2.52zM6.313 15.165a2.527 2.527 0 0 1 2.521-2.52 2.527 2.527 0 0 1 2.521 2.52v6.313A2.528 2.528 0 0 1 8.834 24a2.528 2.528 0 0 1-2.521-2.522v-6.313zM8.834 5.042a2.528 2.528 0 0 1-2.521-2.52A2.528 2.528 0 0 1 8.834 0a2.528 2.528 0 0 1 2.521 2.522v2.52H8.834zM8.834 6.313a2.528 2.528 0 0 1 2.521 2.521 2.528 2.528 0 0 1-2.521 2.521H2.522A2.528 2.528 0 0 1 0 8.834a2.528 2.528 0 0 1 2.522-2.521h6.312zM18.956 8.834a2.528 2.528 0 0 1 2.522-2.521A2.528 2.528 0 0 1 24 8.834a2.528 2.528 0 0 1-2.522 2.521h-2.522V8.834zM17.688 8.834a2.528 2.528 0 0 1-2.523 2.521 2.527 2.527 0 0 1-2.52-2.521V2.522A2.527 2.527 0 0 1 15.165 0a2.528 2.528 0 0 1 2.523 2.522v6.312zM15.165 18.956a2.528 2.528 0 0 1 2.523 2.522A2.528 2.528 0 0 1 15.165 24a2.527 2.527 0 0 1-2.52-2.522v-2.522h2.52zM15.165 17.688a2.527 2.527 0 0 1-2.52-2.523 2.526 2.526 0 0 1 2.52-2.52h6.313A2.527 2.527 0 0 1 24 15.165a2.528 2.528 0 0 1-2.522 2.523h-6.313z" />
-                </svg>
-                <span>Imported from Slack <strong>#{importedSlackChannel.name}</strong></span>
-                <button
-                  onClick={() => setImportedSlackChannel(null)}
-                  className="ml-auto text-[11px] font-medium px-2 py-1 rounded hover:bg-[#E01E5A]/20 transition-colors"
-                  title="Dismiss banner"
-                >
-                  ✕
-                </button>
-              </div>
-            </div>
-          )}
 
           {!canAccessChannel ? (
             <div className="flex items-center justify-center h-full px-6 text-center">
@@ -1017,44 +880,9 @@ export default function ChannelPage() {
                   }}
                   className="w-full flex items-center justify-center gap-2 py-2 rounded-lg border border-[var(--border-default)] text-[13px] font-medium text-[var(--text-primary)] hover:bg-[var(--bg-surface-2)] transition-colors"
                 >
-                  <PlusIcon className="w-4 h-4 text-[var(--text-secondary)]" />
+                  <i className="pi pi-plus text-[14px] text-[var(--text-secondary)]" />
                   Add People
                 </button>
-                {!slackConnected ? (
-                  <button 
-                    onClick={() => {
-                      if (slackOAuthUrl) {
-                        window.open(slackOAuthUrl, 'slackAuth', 'width=600,height=700');
-                      }
-                    }}
-                    className="w-full flex items-center justify-center gap-2 py-2 rounded-lg border border-[var(--border-default)] text-[13px] font-medium text-[var(--text-primary)] hover:bg-[var(--bg-surface-2)] transition-colors"
-                  >
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                      <path d="M5.042 15.165a2.528 2.528 0 0 1-2.52 2.523A2.528 2.528 0 0 1 0 15.165a2.527 2.527 0 0 1 2.522-2.52h2.52v2.52zM6.313 15.165a2.527 2.527 0 0 1 2.521-2.52 2.527 2.527 0 0 1 2.521 2.52v6.313A2.528 2.528 0 0 1 8.834 24a2.528 2.528 0 0 1-2.521-2.522v-6.313zM8.834 5.042a2.528 2.528 0 0 1-2.521-2.52A2.528 2.528 0 0 1 8.834 0a2.528 2.528 0 0 1 2.521 2.522v2.52H8.834zM8.834 6.313a2.528 2.528 0 0 1 2.521 2.521 2.528 2.528 0 0 1-2.521 2.521H2.522A2.528 2.528 0 0 1 0 8.834a2.528 2.528 0 0 1 2.522-2.521h6.312zM18.956 8.834a2.528 2.528 0 0 1 2.522-2.521A2.528 2.528 0 0 1 24 8.834a2.528 2.528 0 0 1-2.522 2.521h-2.522V8.834zM17.688 8.834a2.528 2.528 0 0 1-2.523 2.521 2.527 2.527 0 0 1-2.52-2.521V2.522A2.527 2.527 0 0 1 15.165 0a2.528 2.528 0 0 1 2.523 2.522v6.312zM15.165 18.956a2.528 2.528 0 0 1 2.523 2.522A2.528 2.528 0 0 1 15.165 24a2.527 2.527 0 0 1-2.52-2.522v-2.522h2.52zM15.165 17.688a2.527 2.527 0 0 1-2.52-2.523 2.526 2.526 0 0 1 2.52-2.52h6.313A2.527 2.527 0 0 1 24 15.165a2.528 2.528 0 0 1-2.522 2.523h-6.313z" fill="#E01E5A" />
-                    </svg>
-                    Connect Slack Integration
-                  </button>
-                ) : (
-                  <div className="flex w-full gap-2 text-left">
-                    <select
-                      value={selectedSlackChannel}
-                      onChange={(e) => setSelectedSlackChannel(e.target.value)}
-                      className="flex-1 py-2 px-3 rounded-lg border border-[var(--border-default)] bg-[var(--bg-surface)] text-[13px] text-[var(--text-primary)] outline-none"
-                    >
-                      <option value="">Select a channel...</option>
-                      {availableSlackChannels.map(ch => (
-                        <option key={ch.id} value={ch.id}>#{ch.name}</option>
-                      ))}
-                    </select>
-                    <button 
-                      onClick={handleSlackImport}
-                      disabled={isSlackImporting || !selectedSlackChannel}
-                      className="flex items-center justify-center px-4 rounded-lg bg-[#E01E5A] text-white text-[13px] font-medium hover:bg-[#C2164A] transition-colors disabled:opacity-50"
-                    >
-                      {isSlackImporting ? "Wait..." : "Import"}
-                    </button>
-                  </div>
-                )}
               </div>
             </div>
           ) : (
@@ -1075,8 +903,8 @@ export default function ChannelPage() {
                     {showDiv && <DateDivider label={formatDateDivider(firstMsg.createdAt)} />}
 
                     {/* Message group */}
-                    <div className={`flex px-5 py-2 ${group.isMe ? "justify-end" : "justify-start"}`}>
-                      <div className={`flex gap-2 max-w-[72%] ${group.isMe ? "flex-row-reverse" : "flex-row"}`}>
+                    <div className={`flex px-3 sm:px-5 py-2 ${group.isMe ? "justify-end" : "justify-start"}`}>
+                      <div className={`flex gap-2 max-w-[85%] sm:max-w-[72%] ${group.isMe ? "flex-row-reverse" : "flex-row"}`}>
                         {/* Avatar */}
                         <div className="flex-shrink-0 mt-1">
                           {group.isMe ? (
@@ -1193,7 +1021,7 @@ export default function ChannelPage() {
         )}
 
         {/* Message composer */}
-        <div className={`flex-none px-6 pb-6 pt-2 ${showVideoCall ? 'hidden' : ''}`}>
+        <div className={`flex-none px-3 sm:px-6 pb-4 sm:pb-6 pt-2 relative ${showVideoCall ? 'hidden' : ''}`}>
           {canAccessChannel && !canMessageInChannel && !hideJoinPrompt && (
             <div className="mb-2 flex items-center justify-between rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-3 py-2">
               <p className="text-[12px] text-[var(--text-secondary)]">
@@ -1289,10 +1117,10 @@ export default function ChannelPage() {
               {/* Toolbar */}
               <div className="flex items-center justify-between px-2 pb-2 mt-1">
                 <div className="flex items-center gap-1">
-                  <ToolBtn icon={<PlusIcon className="w-4 h-4" />} title="Add" />
+                  <ToolBtn icon={<i className="pi pi-plus" />} title="Add" />
 
                   <button className="flex items-center gap-1.5 px-2 py-1.5 rounded-md hover:bg-[var(--bg-surface-2)] text-[12px] font-medium text-[var(--text-secondary)] transition-colors">
-                    Message <ChevronRightIcon className="w-3 h-3 rotate-90" />
+                    Message <i className="pi pi-chevron-right text-[10px]" />
                   </button>
 
                   <div className="w-px h-4 bg-[var(--border-subtle)] mx-1" />
@@ -1308,12 +1136,12 @@ export default function ChannelPage() {
                     }}
                   />
                   <ToolBtn
-                    icon={<PaperClipIcon className="w-4 h-4" />}
+                    icon={<i className="pi pi-paperclip" />}
                     title="File"
                     onClick={() => fileInputRef.current?.click()}
                   />
                   <ToolBtn
-                    icon={<FaceSmileIcon className="w-4 h-4" />}
+                    icon={<i className="pi pi-face-smile" />}
                     title="Emoji"
                     onClick={() => setEmojiPickerOpen((open) => !open)}
                   />
@@ -1474,7 +1302,7 @@ export default function ChannelPage() {
                         className="w-full flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-[var(--bg-surface-2)] transition-colors text-left group"
                       >
                         <div className="w-7 h-7 rounded-full bg-[var(--bg-surface-3)] text-[var(--text-secondary)] border border-dashed border-[var(--border-hover)] flex items-center justify-center group-hover:border-[var(--text-secondary)] transition-colors">
-                          <PlusIcon className="w-4 h-4" />
+                          <i className="pi pi-plus" />
                         </div>
                         <span className="text-[13px] font-medium text-[var(--text-primary)]">Add People</span>
                       </button>

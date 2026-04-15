@@ -1,9 +1,13 @@
 import type { Metadata } from "next";
-import { Inter, Crimson_Pro } from "next/font/google";
+import { Inter, Crimson_Pro, Geist } from "next/font/google";
 import "./global.css";
 import ReactQueryProvider from "./providers/ReactQueryProvider";
 import { SocketProvider } from "./providers/SocketProvider";
 import { GlobalIncomingCallBanner } from "./components/videocalls/IncomingCallBanner";
+import { cn } from "@/lib/utils";
+import { PrimeReactProvider } from "primereact/api";
+
+const geist = Geist({subsets:['latin'],variable:'--font-sans'});
 
 const inter = Inter({
   variable: "--font-inter",
@@ -29,16 +33,18 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className="scroll-smooth" suppressHydrationWarning>
+    <html lang="en" className={cn("scroll-smooth", "font-sans", geist.variable)} suppressHydrationWarning>
       <body
         suppressHydrationWarning
         className={`${inter.variable} ${crimsonPro.variable} font-ui antialiased`}
       >
         <ReactQueryProvider>
           <SocketProvider>
-            {children}
-            {/* Global incoming call notification — visible on every page */}
-            <GlobalIncomingCallBanner />
+            <PrimeReactProvider>
+              {children}
+              {/* Global incoming call notification — visible on every page */}
+              <GlobalIncomingCallBanner />
+            </PrimeReactProvider>
           </SocketProvider>
         </ReactQueryProvider>
       </body>

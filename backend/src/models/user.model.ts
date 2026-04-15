@@ -6,6 +6,7 @@ export interface UserDocument extends Document {
     email: string;
     password: string;
     role?: mongoose.Types.ObjectId;
+    avatar?: string;
     emailVerified?: boolean;
     emailVerifiedAt?: Date;
     createdAt: Date;
@@ -29,7 +30,8 @@ const userSchema = new Schema<UserDocument>(
             accessToken: { type: String },
             teamId: { type: String },
             teamName: { type: String },
-        }
+        },
+        avatar: { type: String },
     },
     {
         timestamps: true,

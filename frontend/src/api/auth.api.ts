@@ -22,4 +22,8 @@ export const authApi = {
     });
     return response.data;
   },
+  updateProfile: async (data: { firstName: string, lastName: string, avatar?: string }) => {
+    const response = await api.patch<{ success: boolean; data: any; message: string }>("/users/profile", data);
+    return response.data;
+  },
 };

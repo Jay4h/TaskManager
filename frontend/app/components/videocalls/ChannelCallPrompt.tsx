@@ -118,7 +118,7 @@ export function ChannelCallPrompt({
     const handleStartCall = async () => {
         try {
             setLoading(true);
-            const callData = await videocallsApi.startCall(channelId, recordingEnabled);
+            const callData = await videocallsApi.startCall(channelId, recordingEnabled, callType);
             setHasActiveCall(true);
             onStartCall(callData.token, callData.url, callData.roomName, callData.callId);
         } catch (error) {

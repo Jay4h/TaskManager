@@ -5,6 +5,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { usersApi } from "../../../src/api/users.api";
 import type { CreateUserRequest } from "../../../src/types/user";
 
+
 interface AddUserFormProps {
   onSuccess?: () => void;
 }
@@ -19,6 +20,7 @@ export default function AddUserForm({ onSuccess }: AddUserFormProps) {
     role: "user",
   });
   const [error, setError] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
 
   const createUserMutation = useMutation({
     mutationFn: usersApi.createUser,
@@ -76,7 +78,7 @@ export default function AddUserForm({ onSuccess }: AddUserFormProps) {
         </div>
       )}
 
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div>
           <label htmlFor="firstName" className="block text-sm font-medium text-[var(--text-secondary)] mb-2">
             First Name
@@ -124,14 +126,24 @@ export default function AddUserForm({ onSuccess }: AddUserFormProps) {
         <label htmlFor="password" className="block text-sm font-medium text-[var(--text-secondary)] mb-2">
           Password
         </label>
-        <input
-          id="password"
-          type="password"
-          value={formData.password}
-          onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-          className="claude-input w-full"
-          placeholder="Enter password (min 6 characters)"
-        />
+        <div className="relative">
+          <input
+            id="password"
+            type={showPassword ? "text" : "password"}
+            value={formData.password}
+            onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+            className="claude-input w-full pr-10"
+            placeholder="Enter password (min 6 characters)"
+          />
+          <button
+            type="button"
+            onClick={() => setShowPassword(v => !v)}
+            tabIndex={-1}
+            className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)] hover:text-[var(--text-secondary)] transition-colors"
+          >
+            {showPassword ? <i className="pi pi-eye-slash" /> : <i className="pi pi-eye" />}
+          </button>
+        </div>
       </div>
 
       <div>

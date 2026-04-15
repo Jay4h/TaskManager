@@ -101,7 +101,7 @@ export function SocketProvider({ children }: { children: React.ReactNode }) {
 
             newSocket.on('connect_error', (error) => {
                 console.error(`⚠️ Socket connection error:`, error?.message || error);
-                console.error(`   Message: ${error?.data?.message || 'Unknown error'}`);
+                console.error(`   Message: ${(error as any)?.data?.message || 'Unknown error'}`);
                 const transport = newSocket.io.engine.transport.name;
                 console.error(`   Transport: ${transport}`);
             });

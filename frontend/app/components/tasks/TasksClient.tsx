@@ -3,7 +3,7 @@
 import { useEffect, useState, useMemo } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useSearchParams } from "next/navigation";
-import { Bars4Icon, ViewColumnsIcon } from "@heroicons/react/24/outline";
+
 import TaskTable from "./TaskTable";
 import { SkeletonTasksList } from "../Skeleton";
 
@@ -120,14 +120,14 @@ export default function TasksClient() {
             onClick={() => setViewMode("list")}
             className={`pb-3 text-[12px] sm:text-[13px] font-medium border-b-2 flex items-center gap-1.5 sm:gap-2 transition-colors whitespace-nowrap ${viewMode === 'list' ? 'border-[var(--accent)] text-[var(--accent)]' : 'border-transparent text-[var(--text-secondary)] hover:text-[var(--text-primary)]'}`}
           >
-            <Bars4Icon className="w-3 sm:w-4 h-3 sm:h-4" />
+            <i className="pi pi-list font-bold w-3 sm:w-4 h-3 sm:h-4 text-[12px] sm:text-[14px]" />
             List
           </button>
           <button
             onClick={() => setViewMode("board")}
             className={`pb-3 text-[12px] sm:text-[13px] font-medium border-b-2 flex items-center gap-1.5 sm:gap-2 transition-colors whitespace-nowrap ${viewMode === 'board' ? 'border-[var(--accent)] text-[var(--accent)]' : 'border-transparent text-[var(--text-secondary)] hover:text-[var(--text-primary)]'}`}
           >
-            <ViewColumnsIcon className="w-3 sm:w-4 h-3 sm:h-4" />
+            <i className="pi pi-th-large w-3 sm:w-4 h-3 sm:h-4 text-[12px] sm:text-[14px]" />
             Board
           </button>
         </div>

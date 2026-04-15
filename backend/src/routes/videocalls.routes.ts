@@ -9,6 +9,7 @@ import {
     getChannelCallHistory,
     enableRecording,
     getUserCallStats,
+    getActiveCalls,
 } from '../controllers/videocalls.controller.js';
 import {
     startCallLimiter,
@@ -21,6 +22,9 @@ import {
 const router = Router();
 
 router.use(authMiddleware);
+
+// Get all active calls across all channels
+router.get('/active', getActiveCalls);
 
 // Start a new video call in a channel
 router.post('/:channelId/start-call', startCallLimiter, startChannelVideoCall);

@@ -57,6 +57,15 @@ async function adminMiddleware(req: Request, res: Response, next: NextFunction):
 // Apply auth middleware to all routes
 router.use(authMiddleware);
 
+// User self-update profile
+router.patch("/profile", async (req, res, next) => {
+    try {
+        await usersController.updateProfile(req, res);
+    } catch (error) {
+        next(error);
+    }
+});
+
 // Admin only routes
 router.post("/", adminMiddleware, async (req, res, next) => {
     try {
