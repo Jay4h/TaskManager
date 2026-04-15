@@ -6,7 +6,6 @@ import Link from "next/link";
 import { dashboardApi } from "../../src/api/dashboard.api";
 import { projectsApi } from "../../src/api/projects.api";
 import { SkeletonDashboardCards } from "../components/Skeleton";
-import { FolderIcon, ClipboardDocumentListIcon, UsersIcon } from "@heroicons/react/24/outline";
 
 const PROJECT_COLORS = [
   "#F59E0B", // amber
@@ -145,9 +144,9 @@ export default function DashboardPage() {
             <>
               <OverviewCard title="Workspace Stats">
                 <div className="space-y-4 py-2">
-                  <StatRow label="Total Projects" value={stats.data.totalProjects ?? 0} icon={<FolderIcon className="w-4 h-4" />} />
-                  <StatRow label="Total Tasks" value={stats.data.totalTasks ?? 0} icon={<ClipboardDocumentListIcon className="w-4 h-4" />} />
-                  <StatRow label="Total Users" value={stats.data.totalUsers ?? 0} icon={<UsersIcon className="w-4 h-4" />} />
+                  <StatRow label="Total Projects" value={stats.data.totalProjects ?? 0} icon="pi pi-folder" />
+                  <StatRow label="Total Tasks" value={stats.data.totalTasks ?? 0} icon="pi pi-list-check" />
+                  <StatRow label="Total Users" value={stats.data.totalUsers ?? 0} icon="pi pi-users" />
                 </div>
               </OverviewCard>
 
@@ -295,11 +294,11 @@ function OverviewCard({
   children: React.ReactNode;
 }) {
   return (
-    <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-canvas)] overflow-hidden hover:shadow-soft-lg transition-shadow">
-      <div className="px-4 py-2.5 border-b border-[var(--border-subtle)]">
-        <h3 className="text-[14px] font-semibold text-[var(--text-primary)]">{title}</h3>
+    <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] overflow-hidden hover:shadow-soft-lg transition-shadow">
+      <div className="px-4 py-3 border-b border-[var(--border-subtle)]">
+        <h3 className="text-[13px] font-semibold text-[var(--text-primary)]">{title}</h3>
       </div>
-      <div className="px-4 py-2">{children}</div>
+      <div className="px-4 py-3">{children}</div>
     </div>
   );
 }
@@ -311,19 +310,17 @@ function StatRow({
 }: {
   label: string;
   value: number;
-  icon: React.ReactNode;
+  icon: string;
 }) {
   return (
     <div className="flex items-center justify-between">
       <div className="flex items-center gap-3">
-        <div className="w-8 h-8 rounded-lg flex items-center justify-center text-[var(--text-secondary)] bg-[var(--bg-surface-2)]">
-          {icon}
+        <div className="w-8 h-8 rounded-lg flex items-center justify-center text-[var(--text-secondary)] bg-[var(--bg-surface-3)]">
+          <i className={`${icon} text-[14px]`} />
         </div>
         <span className="text-[13px] text-[var(--text-secondary)] font-medium">{label}</span>
       </div>
-      <span className="text-[18px] font-bold text-[var(--text-primary)]">
-        {value}
-      </span>
+      <span className="text-[18px] font-bold text-[var(--text-primary)]">{value}</span>
     </div>
   );
 }

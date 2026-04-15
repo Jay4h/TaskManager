@@ -2,16 +2,7 @@
 
 import React, { useEffect, useState, useRef, useCallback, useMemo } from "react";
 import { useParams, useSearchParams } from "next/navigation";
-import {
-  PhoneIcon,
-  VideoCameraIcon,
-  PlusIcon,
-  PaperClipIcon,
-  FaceSmileIcon,
-  HashtagIcon,
-  UserGroupIcon,
-  ChevronRightIcon,
-} from "@heroicons/react/24/outline";
+
 import { useSocket } from "../../../providers/SocketProvider";
 import {
   channelsApi,
@@ -24,6 +15,24 @@ import { ChannelVideoCall } from "../../../components/videocalls/ChannelVideoCal
 import { ChannelVoiceCall } from "../../../components/videocalls/ChannelVoiceCall";
 import { ChannelCallPrompt } from "../../../components/videocalls/ChannelCallPrompt";
 import { videocallsApi } from "../../../../src/api/videocalls.api";
+import {
+  HashtagIcon,
+  UserGroupIcon,
+  MagnifyingGlassIcon,
+  BellIcon,
+  VideoCameraIcon,
+  PhoneIcon,
+  ChatBubbleBottomCenterTextIcon as ChatBubbleLeftRightIcon, 
+  ChevronRightIcon,
+  Squares2X2Icon,
+  PaperAirplaneIcon,
+  FaceSmileIcon,
+  PlusIcon,
+  Cog6ToothIcon,
+  EllipsisVerticalIcon,
+  MagnifyingGlassIcon as SearchIcon,
+  MicrophoneIcon,
+} from "@heroicons/react/24/outline";
 
 /* ─── Types ─────────────────────────────────────────────────── */
 type Member = ChannelUser;
@@ -717,7 +726,7 @@ export default function ChannelPage() {
   const messageGroups = groupMessages(messages, currentUser?._id ?? "");
 
   return (
-    <div className="flex h-screen overflow-hidden bg-[var(--bg-canvas)] text-[var(--text-primary)]">
+    <div className="flex h-full overflow-hidden bg-[var(--bg-canvas)] text-[var(--text-primary)]">
       {/* ── MAIN CHAT COLUMN ── */}
       <div className="flex-1 flex flex-col min-w-0">
 
@@ -748,7 +757,7 @@ export default function ChannelPage() {
               className="p-2 rounded-lg hover:bg-[var(--bg-surface-2)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors"
               title="Video Call"
             >
-              <VideoCameraIcon className="w-4 h-4" />
+              <VideoCameraIcon className="w-4.5 h-4.5" />
             </button>
             <div className="w-px h-5 bg-[var(--border-subtle)] mx-1" />
             <button
@@ -756,7 +765,7 @@ export default function ChannelPage() {
               className={`p-2 rounded-lg transition-colors ${membersOpen ? "bg-indigo-500/10 text-indigo-500" : "hover:bg-[var(--bg-surface-2)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]"}`}
               title="Toggle member list"
             >
-              <UserGroupIcon className="w-4 h-4" />
+              <i className="pi pi-users text-[18px] w-4 h-4" ></i>
             </button>
           </div>
         </header>
@@ -871,7 +880,7 @@ export default function ChannelPage() {
                   }}
                   className="w-full flex items-center justify-center gap-2 py-2 rounded-lg border border-[var(--border-default)] text-[13px] font-medium text-[var(--text-primary)] hover:bg-[var(--bg-surface-2)] transition-colors"
                 >
-                  <PlusIcon className="w-4 h-4 text-[var(--text-secondary)]" />
+                  <i className="pi pi-plus text-[14px] text-[var(--text-secondary)]" />
                   Add People
                 </button>
               </div>
@@ -1108,10 +1117,10 @@ export default function ChannelPage() {
               {/* Toolbar */}
               <div className="flex items-center justify-between px-2 pb-2 mt-1">
                 <div className="flex items-center gap-1">
-                  <ToolBtn icon={<PlusIcon className="w-4 h-4" />} title="Add" />
+                  <ToolBtn icon={<i className="pi pi-plus" />} title="Add" />
 
                   <button className="flex items-center gap-1.5 px-2 py-1.5 rounded-md hover:bg-[var(--bg-surface-2)] text-[12px] font-medium text-[var(--text-secondary)] transition-colors">
-                    Message <ChevronRightIcon className="w-3 h-3 rotate-90" />
+                    Message <i className="pi pi-chevron-right text-[10px]" />
                   </button>
 
                   <div className="w-px h-4 bg-[var(--border-subtle)] mx-1" />
@@ -1127,12 +1136,12 @@ export default function ChannelPage() {
                     }}
                   />
                   <ToolBtn
-                    icon={<PaperClipIcon className="w-4 h-4" />}
+                    icon={<i className="pi pi-paperclip" />}
                     title="File"
                     onClick={() => fileInputRef.current?.click()}
                   />
                   <ToolBtn
-                    icon={<FaceSmileIcon className="w-4 h-4" />}
+                    icon={<i className="pi pi-face-smile" />}
                     title="Emoji"
                     onClick={() => setEmojiPickerOpen((open) => !open)}
                   />
@@ -1293,7 +1302,7 @@ export default function ChannelPage() {
                         className="w-full flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-[var(--bg-surface-2)] transition-colors text-left group"
                       >
                         <div className="w-7 h-7 rounded-full bg-[var(--bg-surface-3)] text-[var(--text-secondary)] border border-dashed border-[var(--border-hover)] flex items-center justify-center group-hover:border-[var(--text-secondary)] transition-colors">
-                          <PlusIcon className="w-4 h-4" />
+                          <i className="pi pi-plus" />
                         </div>
                         <span className="text-[13px] font-medium text-[var(--text-primary)]">Add People</span>
                       </button>

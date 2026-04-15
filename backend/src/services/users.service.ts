@@ -253,4 +253,56 @@ export class UsersService {
             message: "User deleted successfully",
         };
     }
+    /**
+     * Update user profile (self-update)
+     */
+    async updateProfile(userId: string, data: { firstName?: string; lastName?: string; avatar?: string }): Promise<any> {
+        const db = mongoose.connection.db;
+        if (!db) {
+            throw new InternalServerError("Database connection failed");
+        }
+
+        if (!mongoose.Types.ObjectId.isValid(userId)) {
+            throw new NotFoundError("User not found");
+        }
+
+        const updateData: any = { updatedAt: new Date() };
+        if (data.firstName !== undefined) {
+            if (typeof data.firstName !== "string" || data.firstName.trim().length === 0) {
+                throw new BadRequestError("First name must be a non-empty string");
+            }
+            updateData.firstName = data.firstName.trim();
+        }
+        if (data.lastName !== undefined) {
+            if (typeof data.lastName !== "string" || data.lastName.trim().length === 0) {
+                throw new BadRequestError("Last name must be a non-empty string");
+            }
+            updateData.lastName = data.lastName.trim();
+        }
+        if (data.avatar !== undefined) {
+            updateData.avatar = data.avatar;
+        }
+
+        const result = await db.collection("users").findOneAndUpdate(
+            { _id: new mongoose.Types.ObjectId(userId) },
+            { $set: updateData },
+            { returnDocument: "after" }
+        );
+
+        if (!result) {
+            throw new NotFoundError("User not found");
+        }
+
+        return {
+            success: true,
+            data: {
+                userId: result._id.toString(),
+                firstName: result.firstName,
+                lastName: result.lastName,
+                email: result.email,
+                avatar: result.avatar,
+            },
+            message: "Profile updated successfully",
+        };
+    }
 }

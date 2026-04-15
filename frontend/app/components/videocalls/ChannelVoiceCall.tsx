@@ -17,7 +17,6 @@ import { AgentAudioVisualizerBar } from '@/components/agent-audio-visualizer-bar
 import { AgentAudioVisualizerAura } from '@/components/agent-audio-visualizer-aura';
 import { useCall } from '@/app/providers/CallProvider';
 import { CallSettingsModal } from './CallSettingsModal';
-
 import { 
     MicrophoneIcon, 
     ChevronDownIcon, 
@@ -25,6 +24,8 @@ import {
     SpeakerWaveIcon,
     XMarkIcon 
 } from '@heroicons/react/24/outline';
+
+
 
 interface VoiceCallProps {
     channelId: string;

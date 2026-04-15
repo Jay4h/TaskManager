@@ -3,6 +3,7 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { XMarkIcon, PaperAirplaneIcon, ChatBubbleLeftEllipsisIcon } from '@heroicons/react/24/outline';
+
 import { useSocket } from '../../providers/SocketProvider';
 import { channelsApi, type ChannelMessage } from '../../../src/api/channels.api';
 

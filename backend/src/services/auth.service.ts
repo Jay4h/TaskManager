@@ -61,6 +61,7 @@ export class AuthService {
         firstName: user.firstName,
         lastName: user.lastName,
         role: userRole,
+        avatar: user.avatar,
         emailVerified: user.emailVerified === true,
       },
     };

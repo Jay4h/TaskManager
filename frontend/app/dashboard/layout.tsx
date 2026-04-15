@@ -43,7 +43,7 @@ export default function DashboardLayout({
   return (
     <CallProvider>
       <div className="flex flex-col md:flex-row h-screen w-full bg-[var(--bg-canvas)] text-[13px] font-sans text-[var(--text-primary)] overflow-hidden">
-        <Suspense fallback={<div className="w-64 bg-[var(--bg-secondary)] overflow-hidden" />}>
+        <Suspense fallback={<div className="w-64 bg-[var(--sidebar-bg)] overflow-hidden" />}>
           <Sidebar userRole={userRole} />
         </Suspense>
         <div className="flex-1 flex flex-col min-w-0 bg-[var(--bg-canvas)] relative overflow-hidden">

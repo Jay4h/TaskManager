@@ -3,7 +3,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { inboxApi, type InboxMessage } from "../../../src/api/inbox.api";
-import { EnvelopeIcon, EnvelopeOpenIcon, TrashIcon, CheckIcon } from "@heroicons/react/24/outline";
+
 
 export default function InboxClient() {
   const [expandedMessages, setExpandedMessages] = useState<Set<string>>(new Set());
@@ -132,7 +132,7 @@ export default function InboxClient() {
       <div className="flex-1 overflow-y-auto">
         {messages.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full text-[var(--text-muted)]">
-            <EnvelopeIcon className="w-12 h-12 mb-3 opacity-50" />
+            <i className="pi pi-envelope text-5xl mb-3 opacity-50" />
             <p className="text-base">No messages yet</p>
             <p className="text-sm">You will receive notifications about assigned tasks and status updates here.</p>
           </div>
@@ -190,9 +190,9 @@ export default function InboxClient() {
                             <span className="text-xs text-[var(--text-muted)]">{formatDate(message.createdAt)}</span>
                             <div className="flex items-center gap-1">
                               {!isUnread && (
-                                <EnvelopeOpenIcon className="w-4 h-4 text-[var(--text-muted)]" />
+                                <i className="pi pi-envelope-open text-[14px] text-[var(--text-muted)]" />
                               )}
-                              {isUnread && <EnvelopeIcon className="w-4 h-4 text-blue-500" />}
+                              {isUnread && <i className="pi pi-envelope text-[14px] text-[var(--ck-blue)]" />}
                             </div>
                           </div>
                         </div>
@@ -245,7 +245,7 @@ export default function InboxClient() {
                               disabled={markAsReadMutation.isPending}
                               className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-green-500/10 text-green-600 hover:bg-green-500/20 text-xs font-medium transition-colors disabled:opacity-50"
                             >
-                              <CheckIcon className="w-4 h-4" />
+                              <i className="pi pi-check" />
                               Mark as read
                             </button>
                           )}
@@ -257,7 +257,7 @@ export default function InboxClient() {
                             disabled={deleteMessageMutation.isPending}
                             className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-red-500/10 text-red-600 hover:bg-red-500/20 text-xs font-medium transition-colors disabled:opacity-50"
                           >
-                            <TrashIcon className="w-4 h-4" />
+                            <i className="pi pi-trash" />
                             Delete
                           </button>
                         </div>

@@ -5,6 +5,7 @@ import ReactQueryProvider from "./providers/ReactQueryProvider";
 import { SocketProvider } from "./providers/SocketProvider";
 import { GlobalIncomingCallBanner } from "./components/videocalls/IncomingCallBanner";
 import { cn } from "@/lib/utils";
+import { PrimeReactProvider } from "primereact/api";
 
 const geist = Geist({subsets:['latin'],variable:'--font-sans'});
 
@@ -39,9 +40,11 @@ export default function RootLayout({
       >
         <ReactQueryProvider>
           <SocketProvider>
-            {children}
-            {/* Global incoming call notification — visible on every page */}
-            <GlobalIncomingCallBanner />
+            <PrimeReactProvider>
+              {children}
+              {/* Global incoming call notification — visible on every page */}
+              <GlobalIncomingCallBanner />
+            </PrimeReactProvider>
           </SocketProvider>
         </ReactQueryProvider>
       </body>

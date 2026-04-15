@@ -145,4 +145,31 @@ export class UsersController {
             }
         }
     }
+    /**
+     * Update user profile (self-update)
+     */
+    async updateProfile(req: Request, res: Response): Promise<void> {
+        try {
+            const userId = req.user?.userId;
+            if (!userId) {
+                res.status(401).json({ error: "Unauthorized" });
+                return;
+            }
+
+            const body = req.body as { firstName?: string; lastName?: string; avatar?: string };
+
+            const result = await this.usersService.updateProfile(userId, body);
+            res.json(result);
+        } catch (error) {
+            console.error("Update profile error:", error);
+            if (error instanceof ForbiddenError || error instanceof BadRequestError || error instanceof NotFoundError) {
+                const err = error as ForbiddenError | BadRequestError | NotFoundError;
+                res.status(err.statusCode).json({ error: err.message });
+            } else if (error instanceof Error) {
+                res.status(500).json({ error: error.message });
+            } else {
+                res.status(500).json({ error: "Server error" });
+            }
+        }
+    }
 }

@@ -1,20 +1,30 @@
 @import "tailwindcss";
 @import "lineicons/dist/lineicons.css";
+@import "primereact/resources/primereact.min.css";
+@import "primeicons/primeicons.css";
 /* @import "tw-animate-css"; */
 /* @import "shadcn/tailwind.css"; */
 
 /* @custom-variant dark (&:is(.dark *)); */
 
-/* ClickUp-inspired clean palette */
+/* ── Design System — Reference-matched palette ── */
 :root {
-  /* Background colors */
-  --bg-canvas: #FFFFFF;
-  --bg-surface: #FAFBFC;
-  --bg-surface-2: #F3F4F6;
-  --bg-surface-3: #E9EBF0;
+  /* Canvas & surface */
+  --bg-canvas: #F2F2F5;
+  --bg-surface: #FFFFFF;
+  --bg-surface-2: #F9FAFB;
+  --bg-surface-3: #F3F4F6;
+
+  /* Sidebar specific */
+  --sidebar-bg: #FFFFFF;
+  --nav-active-bg: #1E1F2A;
+  --nav-active-text: #FFFFFF;
+  --nav-hover-bg: #F3F4F6;
+  --badge-bg: #F3F4F6;
+  --badge-text: #374151;
 
   /* Border colors */
-  --border-subtle: #acb5c0;
+  --border-subtle: #E5E7EB;
   --border-default: #D1D5DB;
   --border-hover: #9CA3AF;
 
@@ -22,116 +32,143 @@
   --text-primary: #111827;
   --text-secondary: #6B7280;
   --text-tertiary: #9CA3AF;
-  --text-muted: #BCC0C7;
+  --text-muted: #C5C8CE;
 
-  /* Accent color - ClickUp purple-blue */
-  --accent: oklch(0.97 0 0);
-  --accent-hover: #343435;
-  --accent-light: rgba(123, 104, 238, 0.1);
+  /* Accent */
+  --accent: #4F46E5;
+  --accent-hover: #4338CA;
+  --accent-light: rgba(79, 70, 229, 0.08);
 
-  /* ClickUp blue */
-  --ck-blue: #0088FF;
-  --ck-blue-hover: #006FD6;
+  /* Brand blue */
+  --ck-blue: #4F46E5;
+  --ck-blue-hover: #4338CA;
 
   /* Status colors */
-  --status-success: #00B884;
+  --status-success: #10B981;
   --status-warning: #F59E0B;
-  --status-error: #E03A3A;
-  --status-info: #0088FF;
+  --status-error: #EF4444;
+  --status-info: #4F46E5;
 
   /* Shadows */
-  --shadow-soft: 0 1px 3px rgba(0, 0, 0, 0.06), 0 1px 2px rgba(0, 0, 0, 0.04);
-  --shadow-soft-lg: 0 4px 12px rgba(0, 0, 0, 0.08), 0 2px 4px rgba(0, 0, 0, 0.04);
+  --shadow-soft: 0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
+  --shadow-soft-lg: 0 4px 16px rgba(0,0,0,0.08), 0 2px 6px rgba(0,0,0,0.04);
 
   /* Radius */
   --radius-sm: 6px;
   --radius-md: 8px;
   --radius-lg: 12px;
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent-foreground: oklch(0.205 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
+
+  /* Shadcn compat */
+  --background: #F2F2F5;
+  --foreground: #111827;
+  --card: #FFFFFF;
+  --card-foreground: #111827;
+  --popover: #FFFFFF;
+  --popover-foreground: #111827;
+  --primary: #1E1F2A;
+  --primary-foreground: #FFFFFF;
+  --secondary: #F3F4F6;
+  --secondary-foreground: #111827;
+  --muted: #F9FAFB;
+  --muted-foreground: #6B7280;
+  --accent-foreground: #111827;
+  --destructive: #EF4444;
+  --border: #E5E7EB;
+  --input: #E5E7EB;
+  --ring: #4F46E5;
+  --chart-1: #4F46E5;
+  --chart-2: #10B981;
+  --chart-3: #F59E0B;
+  --chart-4: #EF4444;
+  --chart-5: #8B5CF6;
   --radius: 0.625rem;
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.205 0 0);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
+  --sidebar: #FFFFFF;
+  --sidebar-foreground: #111827;
+  --sidebar-primary: #1E1F2A;
+  --sidebar-primary-foreground: #FFFFFF;
+  --sidebar-accent: #F3F4F6;
+  --sidebar-accent-foreground: #111827;
+  --sidebar-border: #E5E7EB;
+  --sidebar-ring: #4F46E5;
 }
 
-/* Dark mode */
+/* ── Dark Mode ── */
 .dark {
-  --bg-canvas: #1A1C1E;
-  --bg-surface: #232528;
-  --bg-surface-2: #2D2F33;
-  --bg-surface-3: #3A3D42;
+  /* Canvas & surface */
+  --bg-canvas: #14151A;
+  --bg-surface: #1E1F25;
+  --bg-surface-2: #25262D;
+  --bg-surface-3: #2D2E38;
 
-  --border-subtle: #3A3D42;
-  --border-default: #4A4D52;
-  --border-hover: #6B7280;
+  /* Sidebar specific */
+  --sidebar-bg: #0F1012;
+  --nav-active-bg: #2D2E3F;
+  --nav-active-text: #FFFFFF;
+  --nav-hover-bg: #1E1F25;
+  --badge-bg: #25262D;
+  --badge-text: #A0A3B1;
 
-  --text-primary: #ffffff;
-  --text-secondary: #D1D5DB;
-  --text-tertiary: #9CA3AF;
-  --text-muted: #6B7280;
+  /* Border colors */
+  --border-subtle: #2A2B35;
+  --border-default: #363742;
+  --border-hover: #4A4B58;
 
-  --accent: oklch(0.269 0 0);
-  --accent-hover: #ababab;
-  --accent-light: rgba(155, 138, 251, 0.15);
+  /* Text colors */
+  --text-primary: #F9FAFB;
+  --text-secondary: #A0A3B1;
+  --text-tertiary: #6B7280;
+  --text-muted: #4A4B58;
 
-  --shadow-soft: 0 1px 3px rgba(0, 0, 0, 0.3), 0 1px 2px rgba(0, 0, 0, 0.2);
-  --shadow-soft-lg: 0 4px 12px rgba(0, 0, 0, 0.4), 0 2px 4px rgba(0, 0, 0, 0.3);
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
-  --sidebar: oklch(0.205 0 0);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.269 0 0);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.556 0 0);
+  /* Accent */
+  --accent: #6366F1;
+  --accent-hover: #818CF8;
+  --accent-light: rgba(99, 102, 241, 0.15);
+
+  /* Brand blue */
+  --ck-blue: #6366F1;
+  --ck-blue-hover: #818CF8;
+
+  /* Status colors */
+  --status-success: #10B981;
+  --status-warning: #F59E0B;
+  --status-error: #EF4444;
+  --status-info: #6366F1;
+
+  /* Shadows */
+  --shadow-soft: 0 1px 3px rgba(0,0,0,0.4), 0 1px 2px rgba(0,0,0,0.3);
+  --shadow-soft-lg: 0 4px 16px rgba(0,0,0,0.5), 0 2px 6px rgba(0,0,0,0.4);
+
+  /* Shadcn compat */
+  --background: #14151A;
+  --foreground: #F9FAFB;
+  --card: #1E1F25;
+  --card-foreground: #F9FAFB;
+  --popover: #1E1F25;
+  --popover-foreground: #F9FAFB;
+  --primary: #6366F1;
+  --primary-foreground: #FFFFFF;
+  --secondary: #25262D;
+  --secondary-foreground: #F9FAFB;
+  --muted: #1E1F25;
+  --muted-foreground: #A0A3B1;
+  --accent-foreground: #F9FAFB;
+  --destructive: #EF4444;
+  --border: #2A2B35;
+  --input: #2A2B35;
+  --ring: #6366F1;
+  --chart-1: #6366F1;
+  --chart-2: #10B981;
+  --chart-3: #F59E0B;
+  --chart-4: #EF4444;
+  --chart-5: #8B5CF6;
+  --sidebar: #0F1012;
+  --sidebar-foreground: #F9FAFB;
+  --sidebar-primary: #2D2E3F;
+  --sidebar-primary-foreground: #FFFFFF;
+  --sidebar-accent: #1E1F25;
+  --sidebar-accent-foreground: #F9FAFB;
+  --sidebar-border: #2A2B35;
+  --sidebar-ring: #6366F1;
 }
 
 @theme inline {
@@ -561,10 +598,126 @@ select:-webkit-autofill:focus {
   * {
     @apply border-border outline-ring/50;
   }
+
   body {
     @apply bg-background text-foreground;
   }
+
   html {
     @apply font-sans;
   }
+}
+
+/* ─── PrimeReact Overrides & Custom Styling ─── */
+.p-password {
+  display: flex !important;
+  position: relative !important;
+  width: 100% !important;
+  align-items: center;
+}
+
+.p-password input {
+  padding-right: 2.75rem !important;
+  width: 100% !important;
+}
+
+/* Force the icon to the far right of the container */
+.p-password .p-password-show-icon, 
+.p-password .p-password-hide-icon {
+  position: absolute !important;
+  right: 0.875rem !important;
+  top: 50% !important;
+  transform: translateY(-50%) !important;
+  cursor: pointer;
+  color: var(--text-muted);
+  z-index: 20 !important;
+  margin: 0 !important;
+}
+
+.p-password-panel {
+  background: var(--bg-surface) !important;
+  border: 1px solid var(--border-subtle) !important;
+  border-radius: var(--radius-lg) !important;
+  box-shadow: var(--shadow-soft-lg) !important;
+  padding: 1.25rem !important;
+  z-index: 10001 !important;
+  min-width: 250px;
+  display: flex !important;
+  flex-direction: column !important;
+}
+
+.p-password-info {
+  color: var(--text-primary) !important;
+  font-size: 13px !important;
+  font-weight: 600 !important;
+  margin-top: 0 !important;
+  margin-bottom: 12px !important;
+  order: -1 !important; /* Force text to the top */
+}
+
+/* Strength Meter Colors - Universal Coverage */
+.p-password-panel .p-password-meter {
+  background: var(--bg-surface-3) !important;
+  height: 10px !important;
+  border-radius: 5px !important;
+  overflow: hidden !important;
+  display: block !important;
+  margin-top: 5px !important;
+}
+
+/* Target the actual filling bar - using attribute selectors for maximum robustness */
+.p-password-panel .p-password-meter div[class*="weak"],
+.p-password-panel .p-password-meter.p-password-weak > div {
+  background-color: #ef4444 !important; /* Red */
+  height: 100% !important;
+}
+
+.p-password-panel .p-password-meter div[class*="medium"],
+.p-password-panel .p-password-meter.p-password-medium > div {
+  background-color: #f59e0b !important; /* Amber */
+  height: 100% !important;
+}
+
+.p-password-panel .p-password-meter div[class*="strong"],
+.p-password-panel .p-password-meter.p-password-strong > div {
+  background-color: #10b981 !important; /* Green */
+  height: 100% !important;
+}
+
+/* Ensure the meter bar always has height */
+.p-password-panel .p-password-meter > div {
+  height: 100% !important;
+  display: block !important;
+  transition: width 0.3s ease-in-out, background-color 0.3s ease-in-out !important;
+}
+
+.p-password-info {
+  color: var(--text-primary) !important;
+  font-size: 13px !important;
+  font-weight: 700 !important;
+  margin-top: 0 !important;
+  margin-bottom: 8px !important;
+  order: -1 !important;
+  display: block !important;
+}
+
+.p-avatar.p-avatar-xlarge {
+  width: 128px !important;
+  height: 128px !important;
+}
+
+.p-avatar .p-avatar-icon {
+  font-size: 2rem;
+}
+
+.dark .p-inputtext, .dark .p-dropdown {
+  background: var(--bg-surface-2) !important;
+  border-color: var(--border-subtle) !important;
+  color: var(--text-primary) !important;
+}
+
+.dark .p-dropdown-panel {
+  background: var(--bg-surface) !important;
+  border-color: var(--border-subtle) !important;
+  color: var(--text-primary) !important;
 }

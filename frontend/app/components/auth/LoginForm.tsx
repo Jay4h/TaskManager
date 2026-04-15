@@ -9,6 +9,7 @@ type User = {
     lastName: string;
     email: string;
     role?: "admin" | "user";
+    avatar?: string;
     emailVerified?: boolean;
 };
 
@@ -192,6 +193,7 @@ export default function LoginForm() {
                 lastName: result.data.lastName,
                 email: result.data.email,
                 role: result.data.role,
+                avatar: result.data.avatar,
                 emailVerified: result.data.emailVerified,
             };
 

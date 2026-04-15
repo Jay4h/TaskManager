@@ -7,6 +7,7 @@ import type { User, CreateUserRequest } from "../../../src/types/user";
 import { SkeletonUsersTable } from "../Skeleton";
 
 
+
 export default function UsersClient() {
   const queryClient = useQueryClient();
   const [currentPage, setCurrentPage] = useState(1);
@@ -20,6 +21,7 @@ export default function UsersClient() {
   const [newPassword, setNewPassword] = useState("");
   const [newRole, setNewRole] = useState<"admin" | "user">("user");
   const [roleDropdownOpen, setRoleDropdownOpen] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
   const firstNameRef = useRef<HTMLInputElement>(null);
   const roleDropdownRef = useRef<HTMLDivElement>(null);
@@ -150,7 +152,7 @@ export default function UsersClient() {
         <div className="overflow-x-auto">
           <div className="min-w-[500px] sm:min-w-full">
             {/* Table Header */}
-            <div className="grid grid-cols-[2fr_2fr_1fr_1.2fr_35px] gap-2 sm:gap-4 items-center px-3 sm:px-6 py-2 sm:py-2.5 border-b border-[var(--border-subtle)] bg-[var(--bg-canvas)] text-[10px] sm:text-[12px] font-semibold text-[var(--text-muted)] uppercase tracking-wide">
+            <div className="grid grid-cols-[1.5fr_3fr_1.5fr_1fr_35px] gap-2 sm:gap-4 items-center px-3 sm:px-6 py-2 sm:py-2.5 border-b border-[var(--border-subtle)] bg-[var(--bg-canvas)] text-[10px] sm:text-[12px] font-semibold text-[var(--text-muted)] uppercase tracking-wide">
               <div>Name</div>
               <div>Email</div>
               <div>Role</div>
@@ -181,7 +183,7 @@ export default function UsersClient() {
               users.map((user: User) => (
                 <div
                   key={user._id}
-                  className="grid grid-cols-[2fr_2fr_1fr_1.2fr_35px] gap-2 sm:gap-4 items-center px-3 sm:px-6 py-2 sm:py-2.5 border-b border-[var(--border-subtle)] last:border-0 hover:bg-[var(--bg-surface)] group text-[11px] sm:text-[13px] bg-[var(--bg-canvas)] transition-colors"
+                  className="grid grid-cols-[1.5fr_3fr_1.5fr_1fr_35px] gap-2 sm:gap-4 items-center px-3 sm:px-6 py-2.5 border-b border-[var(--border-subtle)] last:border-0 hover:bg-[var(--bg-surface)] group text-[11px] sm:text-[13px] bg-[var(--bg-canvas)] transition-colors"
                 >
             {/* Name */}
             <div className="min-w-0 flex-1 flex items-center gap-2">
@@ -241,44 +243,67 @@ export default function UsersClient() {
 
             {/* Inline Add User */}
             {isAdding ? (
-              <div className="grid grid-cols-[2fr_2fr_1fr_1.2fr_35px] gap-2 sm:gap-4 items-center px-3 sm:px-6 py-2 sm:py-3 border-t border-[var(--border-subtle)] bg-[var(--bg-canvas)]">
-                <div className="flex items-center gap-1 sm:gap-2">
-                  <input
-                    ref={firstNameRef}
-                    type="text"
-                    value={newFirstName}
-                    onChange={(e) => setNewFirstName(e.target.value)}
-                    placeholder="First Name"
-                    className="flex-1 bg-transparent outline-none text-[11px] sm:text-[13px] font-medium text-[var(--text-primary)] placeholder:text-[var(--text-muted)] border border-[var(--border-subtle)] rounded-md px-2 py-1"
-                    onKeyDown={(e) => e.key === 'Enter' && handleCreateUser()}
-                  />
-                  <input
-                    type="text"
-                    value={newLastName}
-                    onChange={(e) => setNewLastName(e.target.value)}
-                    placeholder="Last Name"
-                    className="flex-1 bg-transparent outline-none text-[11px] sm:text-[13px] font-medium text-[var(--text-primary)] placeholder:text-[var(--text-muted)] border border-[var(--border-subtle)] rounded-md px-2 py-1"
-                    onKeyDown={(e) => e.key === 'Enter' && handleCreateUser()}
-                  />
-                </div>
+              <div className="flex flex-col sm:grid sm:grid-cols-5 gap-3 sm:gap-2 items-stretch sm:items-center px-3 sm:px-4 py-4 sm:py-2.5 border-t border-[var(--border-subtle)] bg-[var(--bg-canvas)] animate-fade-in">
+                {/* First Name */}
+                <input
+                  ref={firstNameRef}
+                  type="text"
+                  value={newFirstName}
+                  onChange={(e) => setNewFirstName(e.target.value)}
+                  placeholder="First Name"
+                  className="w-full bg-transparent outline-none text-[13px] font-medium text-[var(--text-primary)] placeholder:text-[var(--text-muted)] border border-[var(--border-subtle)] rounded-md px-3 py-2 sm:py-1.5 focus:border-[var(--ck-blue)] transition-colors"
+                  onKeyDown={(e) => e.key === 'Enter' && handleCreateUser()}
+                />
 
+                {/* Last Name */}
+                <input
+                  type="text"
+                  value={newLastName}
+                  onChange={(e) => setNewLastName(e.target.value)}
+                  placeholder="Last Name"
+                  className="w-full bg-transparent outline-none text-[13px] font-medium text-[var(--text-primary)] placeholder:text-[var(--text-muted)] border border-[var(--border-subtle)] rounded-md px-3 py-2 sm:py-1.5 focus:border-[var(--ck-blue)] transition-colors"
+                  onKeyDown={(e) => e.key === 'Enter' && handleCreateUser()}
+                />
+
+                {/* Email */}
                 <input
                   type="email"
                   value={newEmail}
                   onChange={(e) => setNewEmail(e.target.value)}
                   placeholder="Email"
-                  className="bg-transparent outline-none text-[11px] sm:text-[12px] text-[var(--text-secondary)] placeholder:text-[var(--text-muted)] border border-[var(--border-subtle)] rounded-md px-2 py-1 w-full"
+                  className="w-full bg-transparent outline-none text-[13px] text-[var(--text-secondary)] placeholder:text-[var(--text-muted)] border border-[var(--border-subtle)] rounded-md px-3 py-2 sm:py-1.5 focus:border-[var(--ck-blue)] transition-colors"
                   onKeyDown={(e) => e.key === 'Enter' && handleCreateUser()}
                 />
 
-                <div className="flex items-center gap-1 sm:gap-2">
+                {/* Password */}
+                <div className="relative w-full">
+                  <input
+                    type={showPassword ? "text" : "password"}
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    placeholder="Password"
+                    className="w-full bg-transparent outline-none text-[13px] text-[var(--text-secondary)] placeholder:text-[var(--text-muted)] border border-[var(--border-subtle)] rounded-md px-3 pr-9 py-1.5 focus:border-[var(--ck-blue)] transition-colors"
+                    onKeyDown={(e) => e.key === 'Enter' && handleCreateUser()}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(v => !v)}
+                    tabIndex={-1}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-[var(--text-muted)] hover:text-[var(--text-secondary)] transition-colors"
+                  >
+                    {showPassword ? <i className="pi pi-eye-slash" /> : <i className="pi pi-eye" />}
+                  </button>
+                </div>
+
+                {/* Role + Actions */}
+                <div className="flex items-center gap-2">
                   <div className="relative flex-1" ref={roleDropdownRef}>
                     <button
                       onClick={() => setRoleDropdownOpen(!roleDropdownOpen)}
-                      className={`w-full flex items-center justify-center rounded px-2 py-1 text-[9px] sm:text-[10px] font-bold tracking-wide cursor-pointer hover:opacity-80 transition-opacity ${newRole === "admin" ? "bg-violet-500 text-white" : "bg-[#00b884] text-white"}`}
+                      className={`w-full flex items-center justify-center rounded px-2 py-1.5 text-[10px] font-bold tracking-wide cursor-pointer hover:opacity-80 transition-opacity ${newRole === "admin" ? "bg-violet-500 text-white" : "bg-[#00b884] text-white"}`}
                     >
                       {newRole.toUpperCase()}
-                      <svg width="6" height="6" viewBox="0 0 24 24" fill="currentColor" className="ml-0.5 sm:ml-1"><path d="M7 10l5 5 5-5z" /></svg>
+                      <svg width="6" height="6" viewBox="0 0 24 24" fill="currentColor" className="ml-1"><path d="M7 10l5 5 5-5z" /></svg>
                     </button>
                     {roleDropdownOpen && (
                       <div className="absolute z-50 top-full left-0 mt-1 w-full rounded shadow-lg bg-[var(--bg-canvas)] border border-[var(--border-subtle)] overflow-hidden">
@@ -287,32 +312,20 @@ export default function UsersClient() {
                       </div>
                     )}
                   </div>
-                  <input
-                    type="password"
-                    value={newPassword}
-                    onChange={(e) => setNewPassword(e.target.value)}
-                    placeholder="Pass"
-                    className="flex-1 bg-transparent outline-none text-[11px] sm:text-[12px] text-[var(--text-secondary)] placeholder:text-[var(--text-muted)] border border-[var(--border-subtle)] rounded-md px-2 py-1"
-                    onKeyDown={(e) => e.key === 'Enter' && handleCreateUser()}
-                  />
-                </div>
-
-                {/* Actions */}
-                <div className="flex justify-center items-center gap-1.5 sm:gap-2">
                   <button
                     onClick={handleCreateUser}
                     disabled={createUserMutation.isPending}
-                    className="text-green-600 hover:text-green-700 transition-colors"
+                    className="text-green-600 hover:text-green-700 transition-colors flex-shrink-0"
                     title="Save User"
                   >
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="sm:w-[18px] sm:h-[18px]"><polyline points="20 6 9 17 4 12" /></svg>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="20 6 9 17 4 12" /></svg>
                   </button>
                   <button
                     onClick={() => setIsAdding(false)}
-                    className="text-gray-400 hover:text-gray-600 transition-colors"
+                    className="text-gray-400 hover:text-gray-600 transition-colors flex-shrink-0"
                     title="Cancel"
                   >
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="sm:w-[18px] sm:h-[18px]"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
                   </button>
                 </div>
               </div>
